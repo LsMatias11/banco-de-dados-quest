@@ -72,8 +72,8 @@ export function useGameState() {
   const [activeTeamId, setActiveTeamId] = useState(savedState?.activeTeamId || 'alfa');
   const [turnIndex, setTurnIndex] = useState(savedState?.turnIndex || 1);
 
-  // Sala Online State (Padronizada para BD-MAIN automática)
-  const [roomCode, setRoomCode] = useState(savedState?.roomCode || 'BD-MAIN');
+  // Sala Online State (Padronizada para BD-MAIN única)
+  const [roomCode, setRoomCode] = useState('BD-MAIN');
   const [isOnlineRoom, setIsOnlineRoom] = useState(savedState?.isOnlineRoom !== undefined ? savedState.isOnlineRoom : true);
   const [viewMode, setViewMode] = useState(savedState?.viewMode || 'LOBBY'); // 'LOBBY' or 'GAME'
 
@@ -144,16 +144,17 @@ export function useGameState() {
   const activeTeam = teams.find((t) => t.id === activeTeamId) || teams[0];
   const currentQuestion = QUESTIONS[currentQuestionIdx % QUESTIONS.length];
 
-  // Auto-conectar se houver parâmetro ?room=BD-xxxx na URL
+  // Forçar conexão com a sala padrão BD-MAIN (ou ?room= na URL)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const roomParam = params.get('room') || params.get('sala');
       if (roomParam) {
-        const cleanCode = roomParam.toUpperCase().trim();
-        setRoomCode(cleanCode);
-        setIsOnlineRoom(true);
+        setRoomCode(roomParam.toUpperCase().trim());
+      } else {
+        setRoomCode('BD-MAIN');
       }
+      setIsOnlineRoom(true);
     }
   }, []);
 

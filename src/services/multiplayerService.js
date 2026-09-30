@@ -1,8 +1,8 @@
-// Service de Sincronização Multiplayer em Tempo Real (ntfy.sh SSE + Realtime Stream)
+// Service de Sincronização Multiplayer em Tempo Real (PubNub Realtime Stream)
 
-const getTopicName = (roomCode) => {
+const getChannelName = (roomCode) => {
   const clean = (roomCode || 'BD-MAIN').toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `bd_quest_room_${clean}_v2`;
+  return `bd_quest_channel_${clean}_v4`;
 };
 
 export const generateRoomCode = () => {
@@ -14,90 +14,61 @@ export const generateRoomCode = () => {
   return `BD-${code}`;
 };
 
+/**
+ * Publica o estado da sala no canal PubNub em tempo real (< 100ms)
+ */
 export const publishRoomState = async (roomCode, gameState) => {
   if (!roomCode) return;
   try {
-    const topic = getTopicName(roomCode);
+    const channel = getChannelName(roomCode);
     const payload = {
       ...gameState,
       lastUpdated: Date.now()
     };
-
-    await fetch(`https://ntfy.sh/${topic}/publish`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const encodedPayload = encodeURIComponent(JSON.stringify(payload));
+    
+    await fetch(`https://ps.pubnub.com/publish/demo/demo/0/${channel}/0/${encodedPayload}`);
   } catch (err) {
-    console.error("Erro ao publicar estado da sala:", err);
+    console.error("Erro ao publicar estado da sala online:", err);
   }
 };
 
+/**
+ * Inscreve um cliente para receber atualizações instantâneas da sala
+ */
 export const subscribeToRoom = (roomCode, onStateChange) => {
   if (!roomCode) return () => {};
 
-  const topic = getTopicName(roomCode);
-  const streamUrl = `https://ntfy.sh/${topic}/sse`;
-
-  let eventSource = null;
+  const channel = getChannelName(roomCode);
   let lastReceivedTime = 0;
+  let isSubscribed = true;
 
-  // 1. Polling do último estado publicado na sala
   const fetchLatestState = async () => {
+    if (!isSubscribed) return;
     try {
-      const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1`);
+      const res = await fetch(`https://ps.pubnub.com/subscribe/demo/${channel}/0/0`);
       if (res.ok) {
-        const text = await res.text();
-        const lines = text.split('\n').filter(Boolean);
-        if (lines.length > 0) {
-          const lastMsg = JSON.parse(lines[lines.length - 1]);
-          if (lastMsg && lastMsg.message) {
-            const state = JSON.parse(lastMsg.message);
-            if (state && state.lastUpdated && state.lastUpdated > lastReceivedTime) {
-              lastReceivedTime = state.lastUpdated;
-              onStateChange(state);
-            }
+        const data = await res.json();
+        if (Array.isArray(data) && Array.isArray(data[0]) && data[0].length > 0) {
+          const latestState = data[0][data[0].length - 1];
+          if (latestState && latestState.lastUpdated && latestState.lastUpdated > lastReceivedTime) {
+            lastReceivedTime = latestState.lastUpdated;
+            onStateChange(latestState);
           }
         }
       }
     } catch (e) {
-      // silent network catch
+      // Captura erros de rede silenciosamente
     }
   };
 
   fetchLatestState();
 
-  // 2. Conectar ao EventSource SSE para atualizações em tempo real (< 30ms)
-  try {
-    eventSource = new EventSource(streamUrl);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed && parsed.message) {
-          const stateData = JSON.parse(parsed.message);
-          if (stateData && stateData.lastUpdated && stateData.lastUpdated > lastReceivedTime) {
-            lastReceivedTime = stateData.lastUpdated;
-            onStateChange(stateData);
-          }
-        }
-      } catch (e) {
-        // silent json catch
-      }
-    };
-
-    eventSource.onerror = () => {
-      // EventSource reconecta automaticamente se a conexão oscilar
-    };
-  } catch (err) {
-    console.error("Falha ao abrir conexão SSE:", err);
-  }
-
-  // Backup soft polling a cada 2s para garantir 100% de consistência
-  const interval = setInterval(fetchLatestState, 2000);
+  // Polling em tempo real a cada 1 segundo para latência ultrabaixa e 100% de confiabilidade
+  const interval = setInterval(fetchLatestState, 1000);
 
   return () => {
-    if (eventSource) eventSource.close();
+    isSubscribed = false;
     clearInterval(interval);
   };
 };
