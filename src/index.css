@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #03050c;
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(121, 40, 202, 0.22), transparent 50%),
+      radial-gradient(circle at 15% 45%, rgba(0, 245, 255, 0.12), transparent 45%),
+      radial-gradient(circle at 85% 75%, rgba(255, 0, 127, 0.12), transparent 45%),
+      linear-gradient(180deg, #070b1a 0%, #03050c 100%);
+    background-attachment: fixed;
+    font-family: 'Outfit', sans-serif;
+    color: #f1f5f9;
+    overflow-x: hidden;
+  }
+}
+
+.sci-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 245, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 245, 255, 0.035) 1px, transparent 1px);
+}
+
+.glass-panel {
+  background: linear-gradient(145deg, rgba(18, 26, 59, 0.78) 0%, rgba(7, 11, 26, 0.92) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 245, 255, 0.22);
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.18);
+}
+
+.glass-panel-magenta {
+  background: linear-gradient(145deg, rgba(35, 12, 42, 0.8) 0%, rgba(10, 6, 20, 0.94) 100%);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 0, 127, 0.28);
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 0, 127, 0.3);
+}
+
+.holo-glow {
+  background: linear-gradient(90deg, #00f5ff, #9d4edd, #ff007f, #ffd166, #00f5ff);
+  background-size: 300% 100%;
+  animation: holoShift 10s ease infinite;
+}
+
+@keyframes holoShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes floatRover {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-5px) scale(1.02); }
+}
+.rover-anim {
+  animation: floatRover 2.6s ease-in-out infinite;
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.95); opacity: 0.9; }
+  50% { transform: scale(1.35); opacity: 0.15; }
+  100% { transform: scale(0.95); opacity: 0.9; }
+}
+.ring-pulse {
+  animation: pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes rotateTimer {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 140; }
+}
+.timer-ring-path {
+  stroke-dasharray: 140;
+  animation: rotateTimer 35s linear infinite;
+}
+
+.scanlines::before {
+  content: " ";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+  background-size: 100% 4px;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.25;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #070b1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f2b5c;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00f5ff;
+}
