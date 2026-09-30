@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { Database, Terminal, Users, CheckCircle2, ShieldCheck, Info, Satellite, Volume2, VolumeX, BookOpen, HelpCircle, User, Lock, Crown } from 'lucide-react';
+import { Database, Terminal, Users, CheckCircle2, ShieldCheck, Info, Satellite, Volume2, VolumeX, BookOpen, HelpCircle, User, Lock, Crown, Globe } from 'lucide-react';
 import AdminAuthModal from './AdminAuthModal';
+import OnlineRoomModal from './OnlineRoomModal';
 
 const TEAMS_DATA = [
   {
     id: 'alfa',
     name: 'Equipe Alfa',
-    color: '#00f0ff',
+    color: '#00f5ff',
     bgBadge: 'bg-primary-container/20 border-primary-container/40 text-primary-container',
-    btnSelected: 'bg-primary-container text-on-primary-fixed shadow-[0_0_15px_rgba(0,240,250,0.5)] font-bold',
+    btnSelected: 'bg-primary-container text-on-primary-fixed shadow-[0_0_15px_rgba(0,240,255,0.5)] font-bold',
     btnUnselected: 'bg-surface-container-highest border border-primary-container/40 text-primary hover:bg-primary-container hover:text-slate-950',
     roverTag: 'ROVER CIANO',
     members: [],
@@ -63,12 +64,17 @@ export default function TeamLobbyScreen({
   adminPassword,
   setAdminPassword,
   checkAdminPassword,
-  logoutAdmin
+  logoutAdmin,
+  roomCode,
+  isOnlineRoom,
+  createOnlineRoom,
+  joinOnlineRoom
 }) {
   const [nameInput, setNameInput] = useState(studentName || '');
   const [courseInput, setCourseInput] = useState('Ciência da Computação');
   const [feedbackMsg, setFeedbackMsg] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showRoomModal, setShowRoomModal] = useState(false);
 
   const selectedTeam = TEAMS_DATA.find((t) => t.id === activeTeamId) || TEAMS_DATA[0];
 
@@ -142,6 +148,19 @@ export default function TeamLobbyScreen({
 
           {/* Direita: Controles Utilitários */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowRoomModal(true)}
+              className={`h-9 px-3 rounded-lg border font-mono text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
+                isOnlineRoom
+                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400/60 shadow-glow-emerald/30 font-bold'
+                  : 'bg-cyan-950/90 border-cyan-500/40 text-cyan-300 hover:bg-cyan-900'
+              }`}
+              type="button"
+            >
+              <Globe className="w-4 h-4 text-cyan-400 animate-pulse" />
+              <span className="uppercase font-bold">{isOnlineRoom ? `SALA: ${roomCode}` : '🌐 CONECTAR SALA'}</span>
+            </button>
+
             <button
               onClick={() => {
                 if (isAdmin) {
@@ -457,6 +476,17 @@ export default function TeamLobbyScreen({
           onClose={() => setShowAuthModal(false)}
         />
       )}
+
+      {/* Modal de Gerenciamento de Sala Online */}
+      <OnlineRoomModal
+        isOpen={showRoomModal}
+        onClose={() => setShowRoomModal(false)}
+        roomCode={roomCode}
+        isOnlineRoom={isOnlineRoom}
+        createOnlineRoom={createOnlineRoom}
+        joinOnlineRoom={joinOnlineRoom}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }

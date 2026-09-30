@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Database, UserPlus, Trophy, Download, Upload, RotateCcw, Sparkles, Volume2, VolumeX, LogOut, HelpCircle, Play, Pause, Square, Lock, Crown } from 'lucide-react';
+import { Database, UserPlus, Trophy, Download, Upload, RotateCcw, Sparkles, Volume2, VolumeX, LogOut, HelpCircle, Play, Pause, Square, Lock, Crown, Globe } from 'lucide-react';
 import AdminAuthModal from './AdminAuthModal';
+import OnlineRoomModal from './OnlineRoomModal';
 
 export default function Header({
   activeTeam,
@@ -25,10 +26,15 @@ export default function Header({
   logoutAdmin,
   onStartGame,
   onTogglePause,
-  onStopGame
+  onStopGame,
+  roomCode,
+  isOnlineRoom,
+  createOnlineRoom,
+  joinOnlineRoom
 }) {
   const fileInputRef = useRef(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showRoomModal, setShowRoomModal] = useState(false);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -214,11 +220,19 @@ export default function Header({
             <span>{isAdmin ? 'ADM' : 'JOGADOR'}</span>
           </button>
 
-          {/* Room Pill */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-            SALA DATE-601 [{teamsCount} EQUIPES]
-          </div>
+          {/* Interactive Online Room Button */}
+          <button
+            onClick={() => setShowRoomModal(true)}
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-mono font-bold transition border cursor-pointer ${
+              isOnlineRoom
+                ? 'bg-emerald-950/90 border-emerald-400 text-emerald-300 shadow-glow-emerald/30'
+                : 'bg-cyan-950/80 border-cyan-500/40 text-cyan-300 hover:bg-cyan-900'
+            }`}
+            title="Gerenciar Sala Online (Multiplayer em Tempo Real)"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>{isOnlineRoom ? `SALA ONLINE: ${roomCode}` : '🌐 CONECTAR SALA ONLINE'}</span>
+          </button>
 
           {/* Ferramentas de ADM: Backup JSON e Modo Turbo (Visíveis apenas quando isAdmin) */}
           {isAdmin && (
@@ -284,6 +298,17 @@ export default function Header({
         logoutAdmin={logoutAdmin}
         adminPassword={adminPassword}
         setAdminPassword={setAdminPassword}
+      />
+
+      {/* MODAL DE GERENCIAMENTO DE SALA ONLINE */}
+      <OnlineRoomModal
+        isOpen={showRoomModal}
+        onClose={() => setShowRoomModal(false)}
+        roomCode={roomCode}
+        isOnlineRoom={isOnlineRoom}
+        createOnlineRoom={createOnlineRoom}
+        joinOnlineRoom={joinOnlineRoom}
+        isAdmin={isAdmin}
       />
     </header>
   );

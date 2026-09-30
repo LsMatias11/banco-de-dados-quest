@@ -64,6 +64,10 @@ export default function App() {
     nextTurn,
     useSabotageCard,
     resetGame,
+    roomCode,
+    isOnlineRoom,
+    createOnlineRoom,
+    joinOnlineRoom,
     handleExportBackup,
     handleImportBackup,
     triggerDemoAction
@@ -93,6 +97,10 @@ export default function App() {
         setAdminPassword={setAdminPassword}
         checkAdminPassword={checkAdminPassword}
         logoutAdmin={logoutAdmin}
+        roomCode={roomCode}
+        isOnlineRoom={isOnlineRoom}
+        createOnlineRoom={createOnlineRoom}
+        joinOnlineRoom={joinOnlineRoom}
       />
     );
   }
@@ -125,6 +133,10 @@ export default function App() {
         onStartGame={startGame}
         onTogglePause={togglePause}
         onStopGame={stopGame}
+        roomCode={roomCode}
+        isOnlineRoom={isOnlineRoom}
+        createOnlineRoom={createOnlineRoom}
+        joinOnlineRoom={joinOnlineRoom}
       />
 
       {/* Demo Control Bar */}

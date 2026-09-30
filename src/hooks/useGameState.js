@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { QUESTIONS, BINGO_BADGES, SABOTAGE_CARDS } from '../data/gameData';
 import confetti from 'canvas-confetti';
 import { saveToLocalStorage, loadFromLocalStorage, exportBackupFile, importBackupFile } from '../utils/backupManager';
+import { generateRoomCode, publishRoomState, subscribeToRoom } from '../services/multiplayerService';
 
 const createEmptyBingo = () => [
   [false, false, false],
@@ -71,6 +72,10 @@ export function useGameState() {
   const [activeTeamId, setActiveTeamId] = useState(savedState?.activeTeamId || 'alfa');
   const [turnIndex, setTurnIndex] = useState(savedState?.turnIndex || 1);
 
+  // Sala Online State
+  const [roomCode, setRoomCode] = useState(savedState?.roomCode || 'BD-2026');
+  const [isOnlineRoom, setIsOnlineRoom] = useState(savedState?.isOnlineRoom || false);
+
   // Controle do ADM / Administrador para Partida
   const [isGameStarted, setIsGameStarted] = useState(savedState?.isGameStarted || false);
   const [isGamePaused, setIsGamePaused] = useState(savedState?.isGamePaused || false);
@@ -134,6 +139,86 @@ export function useGameState() {
   const activeTeam = teams.find((t) => t.id === activeTeamId) || teams[0];
   const currentQuestion = QUESTIONS[currentQuestionIdx % QUESTIONS.length];
 
+  // Auto-conectar se houver parâmetro ?room=BD-xxxx na URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get('room') || params.get('sala');
+      if (roomParam) {
+        const cleanCode = roomParam.toUpperCase().trim();
+        setRoomCode(cleanCode);
+        setIsOnlineRoom(true);
+      }
+    }
+  }, []);
+
+  // Assinar atualizações remotas da sala online
+  useEffect(() => {
+    if (!isOnlineRoom || !roomCode) return;
+
+    const unsubscribe = subscribeToRoom(roomCode, (remoteState) => {
+      if (!remoteState) return;
+
+      if (remoteState.teams) setTeams(remoteState.teams);
+      if (remoteState.activeTeamId) setActiveTeamId(remoteState.activeTeamId);
+      if (remoteState.turnIndex !== undefined) setTurnIndex(remoteState.turnIndex);
+      if (remoteState.isGameStarted !== undefined) setIsGameStarted(remoteState.isGameStarted);
+      if (remoteState.isGamePaused !== undefined) setIsGamePaused(remoteState.isGamePaused);
+      if (remoteState.currentQuestionIdx !== undefined) setCurrentQuestionIdx(remoteState.currentQuestionIdx);
+      if (remoteState.selectedOption !== undefined) setSelectedOption(remoteState.selectedOption);
+      if (remoteState.isAnswered !== undefined) setIsAnswered(remoteState.isAnswered);
+      if (remoteState.answerResult !== undefined) setAnswerResult(remoteState.answerResult);
+      if (remoteState.winner !== undefined) setWinner(remoteState.winner);
+    });
+
+    return () => unsubscribe();
+  }, [roomCode, isOnlineRoom]);
+
+  // Sincronizar estado com a nuvem quando alterado localmente
+  useEffect(() => {
+    if (isOnlineRoom && roomCode) {
+      publishRoomState(roomCode, {
+        teams,
+        activeTeamId,
+        turnIndex,
+        isGameStarted,
+        isGamePaused,
+        currentQuestionIdx,
+        selectedOption,
+        isAnswered,
+        answerResult,
+        winner
+      });
+    }
+  }, [teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, isOnlineRoom, roomCode]);
+
+  const createOnlineRoom = () => {
+    const newCode = generateRoomCode();
+    setRoomCode(newCode);
+    setIsOnlineRoom(true);
+    publishRoomState(newCode, {
+      teams,
+      activeTeamId,
+      turnIndex,
+      isGameStarted,
+      isGamePaused,
+      currentQuestionIdx,
+      selectedOption,
+      isAnswered,
+      answerResult,
+      winner
+    });
+    return newCode;
+  };
+
+  const joinOnlineRoom = (code) => {
+    if (!code) return false;
+    const cleanCode = code.toUpperCase().trim();
+    setRoomCode(cleanCode);
+    setIsOnlineRoom(true);
+    return true;
+  };
+
   // Auto-salvar no LocalStorage
   useEffect(() => {
     saveToLocalStorage({
@@ -147,9 +232,11 @@ export function useGameState() {
       activeSabotages,
       professorName,
       currentQuestionIdx,
-      winner
+      winner,
+      roomCode,
+      isOnlineRoom
     });
-  }, [teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, isAdmin, adminPassword, activeSabotages, professorName, currentQuestionIdx, winner]);
+  }, [teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, isAdmin, adminPassword, activeSabotages, professorName, currentQuestionIdx, winner, roomCode, isOnlineRoom]);
 
   // Cadastrar nova Equipe
   const registerTeam = ({ name, members, color, roverName }) => {
@@ -502,6 +589,12 @@ export function useGameState() {
     nextTurn,
     useSabotageCard,
     resetGame,
+    roomCode,
+    setRoomCode,
+    isOnlineRoom,
+    setIsOnlineRoom,
+    createOnlineRoom,
+    joinOnlineRoom,
     handleExportBackup,
     handleImportBackup,
     triggerDemoAction
