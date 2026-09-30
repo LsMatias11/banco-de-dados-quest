@@ -173,32 +173,16 @@ export default function TeamLobbyScreen({
           <div className="hidden xl:flex items-center gap-3 bg-slate-950/80 border border-slate-800 px-4 py-1.5 rounded-full font-mono text-xs text-slate-300 shadow-inner">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-white font-semibold tracking-wide">SALA ONLINE: {roomCode || 'BD-MAIN'}</span>
+              <span className="text-white font-semibold tracking-wide">SERVIDORES: CONECTADOS</span>
             </div>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-300">{displayTeams.length} EQUIPES CONECTADAS</span>
+            <span className="text-slate-300">{displayTeams.length} EQUIPES ATIVAS</span>
             <span className="text-slate-600">•</span>
-            <span className="text-cyan-400 font-semibold">SYNC: 100%</span>
-            <span className="text-slate-600">•</span>
-            <div className="flex items-center gap-1 text-emerald-400 font-bold">
-              <span>PING: 24ms</span>
-            </div>
+            <span className="text-cyan-400 font-semibold">SYNC: 100% (GLOBAL)</span>
           </div>
 
           {/* Direita: Controles Utilitários */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowRoomModal(true)}
-              className={`h-9 px-3 rounded-lg border font-mono text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
-                isOnlineRoom
-                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400/60 shadow-glow-emerald/30 font-bold'
-                  : 'bg-cyan-950/90 border-cyan-500/40 text-cyan-300 hover:bg-cyan-900'
-              }`}
-              type="button"
-            >
-              <Globe className="w-4 h-4 text-cyan-400 animate-pulse" />
-              <span className="uppercase font-bold">{isOnlineRoom ? `SALA: ${roomCode}` : '🌐 CONECTAR SALA'}</span>
-            </button>
 
             <button
               onClick={() => {
@@ -540,17 +524,6 @@ export default function TeamLobbyScreen({
           onClose={() => setShowAuthModal(false)}
         />
       )}
-
-      {/* Modal de Gerenciamento de Sala Online */}
-      <OnlineRoomModal
-        isOpen={showRoomModal}
-        onClose={() => setShowRoomModal(false)}
-        roomCode={roomCode}
-        isOnlineRoom={isOnlineRoom}
-        createOnlineRoom={createOnlineRoom}
-        joinOnlineRoom={joinOnlineRoom}
-        isAdmin={isAdmin}
-      />
     </div>
   );
 }

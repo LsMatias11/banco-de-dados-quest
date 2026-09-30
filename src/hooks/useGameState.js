@@ -174,11 +174,9 @@ const sanitizeMembers = (membersList) => {
   return unique;
 };
 
-  // Assinar atualizações remotas da sala online
+  // Assinar atualizações remotas do jogo global em tempo real
   useEffect(() => {
-    if (!isOnlineRoom || !roomCode) return;
-
-    const unsubscribe = subscribeToRoom(roomCode, (remoteState) => {
+    const unsubscribe = subscribeToRoom('GLOBAL', (remoteState) => {
       if (!remoteState) return;
 
       if (remoteState.viewMode) setViewMode(remoteState.viewMode);
@@ -202,7 +200,7 @@ const sanitizeMembers = (membersList) => {
     });
 
     return () => unsubscribe();
-  }, [roomCode, isOnlineRoom]);
+  }, []);
 
   // Função para cadastrar / associar membro a uma equipe (substitui nome antigo se editado)
   const joinTeamMember = useCallback(({ teamId, studentName, previousName }) => {
@@ -240,25 +238,23 @@ const sanitizeMembers = (membersList) => {
         return { ...team, members: currentMembers };
       });
 
-      if (isOnlineRoom && roomCode) {
-        publishRoomState(roomCode, {
-          viewMode,
-          teams: updatedTeams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
-          activeTeamId,
-          turnIndex,
-          isGameStarted,
-          isGamePaused,
-          currentQuestionIdx,
-          selectedOption,
-          isAnswered,
-          answerResult,
-          winner
-        });
-      }
+      publishRoomState('GLOBAL', {
+        viewMode,
+        teams: updatedTeams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+        activeTeamId,
+        turnIndex,
+        isGameStarted,
+        isGamePaused,
+        currentQuestionIdx,
+        selectedOption,
+        isAnswered,
+        answerResult,
+        winner
+      });
 
       return updatedTeams;
     });
-  }, [isOnlineRoom, roomCode, viewMode, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner]);
+  }, [viewMode, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner]);
 
   // Remover membro de uma equipe (Exclusivo para Administrador)
   const removeTeamMember = useCallback(({ teamId, studentName }) => {
@@ -276,25 +272,23 @@ const sanitizeMembers = (membersList) => {
         };
       });
 
-      if (isOnlineRoom && roomCode) {
-        publishRoomState(roomCode, {
-          viewMode,
-          teams: updatedTeams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
-          activeTeamId,
-          turnIndex,
-          isGameStarted,
-          isGamePaused,
-          currentQuestionIdx,
-          selectedOption,
-          isAnswered,
-          answerResult,
-          winner
-        });
-      }
+      publishRoomState('GLOBAL', {
+        viewMode,
+        teams: updatedTeams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+        activeTeamId,
+        turnIndex,
+        isGameStarted,
+        isGamePaused,
+        currentQuestionIdx,
+        selectedOption,
+        isAnswered,
+        answerResult,
+        winner
+      });
 
       return updatedTeams;
     });
-  }, [isOnlineRoom, roomCode, viewMode, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner]);
+  }, [viewMode, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner]);
 
   const createOnlineRoom = () => {
     const newCode = generateRoomCode();
@@ -431,28 +425,25 @@ const sanitizeMembers = (membersList) => {
     }
   }, [activeTeamId, activeSabotages.timeoutActive, isGameStarted, isGamePaused]);
 
-  // Funções de Controle do ADM / Professor
   const startGame = () => {
     setIsGameStarted(true);
     setIsGamePaused(false);
     setTimerActive(true);
     setViewMode('GAME');
 
-    if (isOnlineRoom && roomCode) {
-      publishRoomState(roomCode, {
-        viewMode: 'GAME',
-        teams: teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
-        activeTeamId,
-        turnIndex,
-        isGameStarted: true,
-        isGamePaused: false,
-        currentQuestionIdx,
-        selectedOption,
-        isAnswered,
-        answerResult,
-        winner
-      });
-    }
+    publishRoomState('GLOBAL', {
+      viewMode: 'GAME',
+      teams: teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+      activeTeamId,
+      turnIndex,
+      isGameStarted: true,
+      isGamePaused: false,
+      currentQuestionIdx,
+      selectedOption,
+      isAnswered,
+      answerResult,
+      winner
+    });
   };
 
   const pauseGame = () => {
@@ -644,21 +635,19 @@ const sanitizeMembers = (membersList) => {
     setRollbackAlert(null);
     setViewMode('LOBBY');
 
-    if (isOnlineRoom && roomCode) {
-      publishRoomState(roomCode, {
-        viewMode: 'LOBBY',
-        teams: INITIAL_TEAMS,
-        activeTeamId: 'alfa',
-        turnIndex: 1,
-        isGameStarted: false,
-        isGamePaused: false,
-        currentQuestionIdx: 0,
-        selectedOption: null,
-        isAnswered: false,
-        answerResult: null,
-        winner: null
-      });
-    }
+    publishRoomState('GLOBAL', {
+      viewMode: 'LOBBY',
+      teams: INITIAL_TEAMS,
+      activeTeamId: 'alfa',
+      turnIndex: 1,
+      isGameStarted: false,
+      isGamePaused: false,
+      currentQuestionIdx: 0,
+      selectedOption: null,
+      isAnswered: false,
+      answerResult: null,
+      winner: null
+    });
   };
 
   // Ações da Barra de Apresentação
