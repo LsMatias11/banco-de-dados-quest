@@ -108,16 +108,20 @@ export default function Header({
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
             </div>
-            {/* 4 Members Chips */}
+            {/* Members Chips */}
             <div className="flex items-center gap-1 mt-0.5">
-              {(activeTeam?.members || ['Dev1', 'DBA', 'Arq', 'Anl']).map((m, i) => (
-                <span
-                  key={i}
-                  className="text-[9px] font-mono px-1 rounded bg-cyan-950/90 border border-cyan-500/40 text-cyan-300"
-                >
-                  {m}
-                </span>
-              ))}
+              {(activeTeam?.members || []).length > 0 ? (
+                activeTeam.members.map((m, i) => (
+                  <span
+                    key={i}
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/90 border border-cyan-500/40 text-cyan-300 font-bold"
+                  >
+                    {typeof m === 'string' ? m : m?.name || 'Aluno'}
+                  </span>
+                ))
+              ) : (
+                <span className="text-[9px] font-mono text-slate-500 italic">Sem integrantes ainda</span>
+              )}
               <span className="text-[9px] text-slate-400 font-mono ml-1 hidden sm:inline">• {activeTeam?.roverName}</span>
             </div>
           </div>

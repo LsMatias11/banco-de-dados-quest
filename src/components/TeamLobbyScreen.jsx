@@ -279,8 +279,10 @@ export default function TeamLobbyScreen({
                       onChange={(e) => {
                         setNameInput(e.target.value);
                         if (setStudentName) setStudentName(e.target.value);
-                        if (joinTeamMember && e.target.value.trim()) {
-                          joinTeamMember({ teamId: activeTeamId, studentName: e.target.value });
+                      }}
+                      onBlur={() => {
+                        if (joinTeamMember && nameInput.trim().length >= 2) {
+                          joinTeamMember({ teamId: activeTeamId, studentName: nameInput.trim() });
                         }
                       }}
                     />

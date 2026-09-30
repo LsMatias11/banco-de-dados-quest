@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { UserPlus, Sparkles, Check, Database, X, Shield, Users } from 'lucide-react';
 
 const TEAM_PRESETS = [
-  { id: 'alfa', name: 'Equipe Alfa', color: '#00f5ff', roverName: 'Rover Alfa V2', members: ['Dev1', 'DBA', 'Arq', 'Anl'] },
-  { id: 'beta', name: 'Equipe Beta', color: '#ffb703', roverName: 'Rover Beta V1', members: ['Dev2', 'DBA2', 'Arq2', 'Anl2'] },
-  { id: 'gama', name: 'Equipe Gama', color: '#9d4edd', roverName: 'Rover Gama V1', members: ['Dev3', 'DBA3', 'Arq3', 'Anl3'] },
-  { id: 'delta', name: 'Equipe Delta', color: '#ff007f', roverName: 'Rover Delta V1', members: ['Dev4', 'DBA4', 'Arq4', 'Anl4'] }
+  { id: 'alfa', name: 'Equipe Alfa', color: '#00f5ff', roverName: 'Rover Alfa V2', members: [] },
+  { id: 'beta', name: 'Equipe Beta', color: '#ffb703', roverName: 'Rover Beta V1', members: [] },
+  { id: 'gama', name: 'Equipe Gama', color: '#9d4edd', roverName: 'Rover Gama V1', members: [] },
+  { id: 'delta', name: 'Equipe Delta', color: '#ff007f', roverName: 'Rover Delta V1', members: [] }
 ];
 
 export default function LobbyModal({ isOpen, onClose, onRegisterTeam, teams, activeTeamId, setActiveTeamId }) {
@@ -21,7 +21,7 @@ export default function LobbyModal({ isOpen, onClose, onRegisterTeam, teams, act
 
     const members = membersInput.trim()
       ? membersInput.split(',').map((m) => m.trim())
-      : ['Dev1', 'DBA', 'Arq', 'Anl'];
+      : [];
 
     onRegisterTeam({
       name: teamName.trim(),

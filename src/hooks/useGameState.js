@@ -153,7 +153,23 @@ export function useGameState() {
     }
   }, []);
 
-  // Assinar atualizações remotas da sala online
+  const BOTS = ['Dev', 'Dev1', 'Dev2', 'Dev3', 'Dev4', 'DBA', 'DBA2', 'DBA3', 'DBA4', 'Arq', 'Arq2', 'Arq3', 'Arq4', 'Anl', 'Anl2', 'Anl3', 'Anl4'];
+
+const sanitizeMembers = (membersList) => {
+  if (!Array.isArray(membersList)) return [];
+  const unique = [];
+  membersList.forEach((m) => {
+    const nameStr = typeof m === 'string' ? m : m?.name;
+    if (!nameStr || typeof nameStr !== 'string') return;
+    const trimmed = nameStr.trim();
+    if (trimmed.length >= 2 && !BOTS.includes(trimmed) && !unique.includes(trimmed)) {
+      unique.push(trimmed);
+    }
+  });
+  return unique;
+};
+
+// Assinar atualizações remotas da sala online
   useEffect(() => {
     if (!isOnlineRoom || !roomCode) return;
 
@@ -161,7 +177,14 @@ export function useGameState() {
       if (!remoteState) return;
 
       if (remoteState.viewMode) setViewMode(remoteState.viewMode);
-      if (remoteState.teams) setTeams(remoteState.teams);
+      if (remoteState.teams) {
+        setTeams(
+          remoteState.teams.map((t) => ({
+            ...t,
+            members: sanitizeMembers(t.members)
+          }))
+        );
+      }
       if (remoteState.activeTeamId) setActiveTeamId(remoteState.activeTeamId);
       if (remoteState.turnIndex !== undefined) setTurnIndex(remoteState.turnIndex);
       if (remoteState.isGameStarted !== undefined) setIsGameStarted(remoteState.isGameStarted);
@@ -181,7 +204,7 @@ export function useGameState() {
     if (isOnlineRoom && roomCode) {
       publishRoomState(roomCode, {
         viewMode,
-        teams,
+        teams: teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
         activeTeamId,
         turnIndex,
         isGameStarted,
@@ -196,26 +219,30 @@ export function useGameState() {
   }, [viewMode, teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, isOnlineRoom, roomCode]);
 
   // Função para cadastrar / associar membro a uma equipe
-  const joinTeamMember = useCallback(({ teamId, studentName }) => {
-    if (!studentName || !studentName.trim()) return;
+  const joinTeamMember = useCallback(({ teamId, studentName, previousName }) => {
+    if (!studentName || studentName.trim().length < 2) return;
     const cleanName = studentName.trim();
 
     setTeams((prevTeams) =>
       prevTeams.map((team) => {
-        const currentMembers = team.members || [];
-        const filtered = currentMembers.filter(
-          (m) => (typeof m === 'string' ? m : m.name) !== cleanName
-        );
+        let currentMembers = sanitizeMembers(team.members);
+
+        // Se o usuario tinha um rascunho anterior de nome, remove
+        if (previousName && previousName.trim()) {
+          currentMembers = currentMembers.filter((m) => m !== previousName.trim());
+        }
 
         if (team.id === teamId) {
-          const alreadyIn = currentMembers.some(
-            (m) => (typeof m === 'string' ? m : m.name) === cleanName
-          );
-          if (!alreadyIn && filtered.length < 8) {
-            return { ...team, members: [...filtered, cleanName] };
+          // Se o nome completo limpo ainda nao esta na equipe, adiciona
+          if (!currentMembers.includes(cleanName) && currentMembers.length < 8) {
+            currentMembers = [...currentMembers, cleanName];
           }
+        } else {
+          // Remove de outras equipes para manter 1 usuario por equipe
+          currentMembers = currentMembers.filter((m) => m !== cleanName);
         }
-        return { ...team, members: filtered };
+
+        return { ...team, members: currentMembers };
       })
     );
   }, []);
