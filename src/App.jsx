@@ -66,6 +66,7 @@ export default function App() {
     viewMode,
     setViewMode,
     joinTeamMember,
+    removeTeamMember,
     roomCode,
     isOnlineRoom,
     createOnlineRoom,
@@ -108,6 +109,7 @@ export default function App() {
         joinOnlineRoom={joinOnlineRoom}
         teams={teams}
         joinTeamMember={joinTeamMember}
+        removeTeamMember={removeTeamMember}
       />
     );
   }
@@ -144,6 +146,7 @@ export default function App() {
         isOnlineRoom={isOnlineRoom}
         createOnlineRoom={createOnlineRoom}
         joinOnlineRoom={joinOnlineRoom}
+        onRemoveMember={removeTeamMember}
       />
 
       {/* Demo Control Bar */}

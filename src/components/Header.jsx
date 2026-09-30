@@ -30,7 +30,8 @@ export default function Header({
   roomCode,
   isOnlineRoom,
   createOnlineRoom,
-  joinOnlineRoom
+  joinOnlineRoom,
+  onRemoveMember
 }) {
   const fileInputRef = useRef(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -109,16 +110,32 @@ export default function Header({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
             </div>
             {/* Members Chips */}
-            <div className="flex items-center gap-1 mt-0.5">
+            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
               {(activeTeam?.members || []).length > 0 ? (
-                activeTeam.members.map((m, i) => (
-                  <span
-                    key={i}
-                    className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/90 border border-cyan-500/40 text-cyan-300 font-bold"
-                  >
-                    {typeof m === 'string' ? m : m?.name || 'Aluno'}
-                  </span>
-                ))
+                activeTeam.members.map((m, i) => {
+                  const nameStr = typeof m === 'string' ? m : m?.name || 'Aluno';
+                  return (
+                    <span
+                      key={i}
+                      className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/90 border border-cyan-500/40 text-cyan-300 font-bold inline-flex items-center gap-1"
+                    >
+                      <span>{nameStr}</span>
+                      {isAdmin && onRemoveMember && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemoveMember({ teamId: activeTeam.id, studentName: nameStr });
+                          }}
+                          className="w-3.5 h-3.5 rounded-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white flex items-center justify-center font-bold text-[9px] transition ml-0.5 cursor-pointer"
+                          title={`Remover ${nameStr}`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  );
+                })
               ) : (
                 <span className="text-[9px] font-mono text-slate-500 italic">Sem integrantes ainda</span>
               )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { QUESTIONS, BINGO_BADGES, SABOTAGE_CARDS } from '../data/gameData';
 import confetti from 'canvas-confetti';
 import { saveToLocalStorage, loadFromLocalStorage, exportBackupFile, importBackupFile } from '../utils/backupManager';
@@ -76,6 +76,10 @@ export function useGameState() {
   const [roomCode, setRoomCode] = useState(savedState?.roomCode || 'BD-MAIN');
   const [isOnlineRoom, setIsOnlineRoom] = useState(savedState?.isOnlineRoom !== undefined ? savedState.isOnlineRoom : true);
   const [viewMode, setViewMode] = useState(savedState?.viewMode || 'LOBBY'); // 'LOBBY' or 'GAME'
+
+  // Refs de controle de sincronização remota (evitam sobreposição/loop)
+  const isRemoteUpdateRef = useRef(false);
+  const isInitialMountRef = useRef(false);
 
   // Controle do ADM / Administrador para Partida
   const [isGameStarted, setIsGameStarted] = useState(savedState?.isGameStarted || false);
@@ -176,6 +180,8 @@ const sanitizeMembers = (membersList) => {
     const unsubscribe = subscribeToRoom(roomCode, (remoteState) => {
       if (!remoteState) return;
 
+      isRemoteUpdateRef.current = true;
+
       if (remoteState.viewMode) setViewMode(remoteState.viewMode);
       if (remoteState.teams) {
         setTeams(
@@ -201,6 +207,16 @@ const sanitizeMembers = (membersList) => {
 
   // Sincronizar estado com a nuvem quando alterado localmente
   useEffect(() => {
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false;
+      return;
+    }
+
+    if (!isInitialMountRef.current) {
+      isInitialMountRef.current = true;
+      return; // Evita sobrescrever o estado da sala na nuvem com o estado padrão local no primeiro carregamento
+    }
+
     if (isOnlineRoom && roomCode) {
       publishRoomState(roomCode, {
         viewMode,
@@ -252,6 +268,24 @@ const sanitizeMembers = (membersList) => {
         }
 
         return { ...team, members: currentMembers };
+      })
+    );
+  }, []);
+
+  // Remover membro de uma equipe (Exclusivo para Administrador)
+  const removeTeamMember = useCallback(({ teamId, studentName }) => {
+    if (!studentName) return;
+    const cleanName = studentName.trim();
+
+    setTeams((prevTeams) =>
+      prevTeams.map((team) => {
+        if (team.id !== teamId) return team;
+        return {
+          ...team,
+          members: sanitizeMembers(team.members).filter(
+            (m) => (typeof m === 'string' ? m : m.name) !== cleanName
+          )
+        };
       })
     );
   }, []);
@@ -654,6 +688,7 @@ const sanitizeMembers = (membersList) => {
     viewMode,
     setViewMode,
     joinTeamMember,
+    removeTeamMember,
     roomCode,
     setRoomCode,
     isOnlineRoom,

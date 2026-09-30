@@ -70,7 +70,8 @@ export default function TeamLobbyScreen({
   createOnlineRoom,
   joinOnlineRoom,
   teams,
-  joinTeamMember
+  joinTeamMember,
+  removeTeamMember
 }) {
   const [nameInput, setNameInput] = useState(studentName || '');
   const [courseInput, setCourseInput] = useState('Ciência da Computação');
@@ -403,54 +404,70 @@ export default function TeamLobbyScreen({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between flex-wrap gap-3 pt-1 border-t border-slate-800">
-                        {/* Avatares dos Membros */}
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex -space-x-2 overflow-hidden">
-                            {currentMembers.length > 0 ? (
-                              currentMembers.map((mem, idx) => {
-                                const nameStr = typeof mem === 'string' ? mem : mem.name || 'Aluno';
-                                return (
-                                  <div
-                                    key={idx}
-                                    className="w-7 h-7 rounded-full bg-slate-950 border border-cyan-400/40 flex items-center justify-center font-mono text-cyan-300 text-[10px] font-bold shadow"
-                                    title={nameStr}
-                                  >
-                                    {getInitials(nameStr)}
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <span className="font-mono text-[11px] text-slate-500 italic">
-                                NENHUM JOGADOR NA EQUIPE
-                              </span>
-                            )}
-                          </div>
+                      <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
+                        <div className="flex items-center justify-between">
                           <span className="font-mono text-xs text-slate-300 font-bold">
-                            {currentMembers.length}/{maxSlots} Cadastrados
+                            Membros Conectados ({currentMembers.length}/{maxSlots}):
                           </span>
                         </div>
 
-                        {/* Botão de Seleção de Equipe */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectTeam(team.id);
-                          }}
-                          className={`px-4 py-2 rounded-lg font-display text-xs uppercase font-bold tracking-wider shadow flex items-center gap-1.5 transition active:scale-95 ${
-                            isSelected ? team.btnSelected : team.btnUnselected
-                          }`}
-                        >
-                          {isSelected ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                              <span>EQUIPE SELECIONADA</span>
-                            </>
-                          ) : (
-                            <span>JUNTAR-SE À {team.name.split(' ')[1]?.toUpperCase() || 'EQUIPE'}</span>
-                          )}
-                        </button>
+                        {currentMembers.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {currentMembers.map((mem, idx) => {
+                              const nameStr = typeof mem === 'string' ? mem : mem.name || 'Aluno';
+                              return (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-950 border border-cyan-400/40 text-cyan-200 shadow-sm font-bold"
+                                >
+                                  <User className="w-3 h-3 text-cyan-400" />
+                                  <span>{nameStr}</span>
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (removeTeamMember) {
+                                          removeTeamMember({ teamId: team.id, studentName: nameStr });
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white flex items-center justify-center font-bold text-xs transition ml-1 cursor-pointer"
+                                      title={`Remover ${nameStr} da ${team.name}`}
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="font-mono text-[11px] text-slate-500 italic">
+                            NENHUM JOGADOR CONECTADO NESTA EQUIPE
+                          </span>
+                        )}
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectTeam(team.id);
+                            }}
+                            className={`px-4 py-2 rounded-lg font-display text-xs uppercase font-bold tracking-wider shadow flex items-center gap-1.5 transition active:scale-95 ${
+                              isSelected ? team.btnSelected : team.btnUnselected
+                            }`}
+                          >
+                            {isSelected ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                                <span>EQUIPE SELECIONADA</span>
+                              </>
+                            ) : (
+                              <span>JUNTAR-SE À {team.name.split(' ')[1]?.toUpperCase() || 'EQUIPE'}</span>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
