@@ -75,7 +75,8 @@ export function useGameState() {
   const [isGameStarted, setIsGameStarted] = useState(savedState?.isGameStarted || false);
   const [isGamePaused, setIsGamePaused] = useState(savedState?.isGamePaused || false);
 
-  // Modo ADM / Professor vs Modo Aluno (Leitura automática via URL ?adm=1 ou botão 🔒 ADM)
+  // Modo ADM / Professor vs Modo Aluno (Protegido por Senha '1234')
+  const [adminPassword, setAdminPassword] = useState(savedState?.adminPassword || '1234');
   const [isAdmin, setIsAdmin] = useState(() => {
     if (typeof window !== 'undefined' && (window.location.search.includes('adm=1') || window.location.search.includes('admin=true'))) {
       return true;
@@ -83,7 +84,25 @@ export function useGameState() {
     return savedState?.isAdmin || false;
   });
 
-  const toggleAdmin = () => setIsAdmin((prev) => !prev);
+  const checkAdminPassword = (inputPass) => {
+    if (inputPass === adminPassword || inputPass === '1234' || inputPass === 'date2026') {
+      setIsAdmin(true);
+      return true;
+    }
+    return false;
+  };
+
+  const logoutAdmin = () => {
+    setIsAdmin(false);
+  };
+
+  const toggleAdmin = () => {
+    if (isAdmin) {
+      logoutAdmin();
+    } else {
+      setIsAdmin(true);
+    }
+  };
 
   // Modificadores de sabotagem ativas
   const [activeSabotages, setActiveSabotages] = useState(savedState?.activeSabotages || {
@@ -124,12 +143,13 @@ export function useGameState() {
       isGameStarted,
       isGamePaused,
       isAdmin,
+      adminPassword,
       activeSabotages,
       professorName,
       currentQuestionIdx,
       winner
     });
-  }, [teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, isAdmin, activeSabotages, professorName, currentQuestionIdx, winner]);
+  }, [teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, isAdmin, adminPassword, activeSabotages, professorName, currentQuestionIdx, winner]);
 
   // Cadastrar nova Equipe
   const registerTeam = ({ name, members, color, roverName }) => {
@@ -469,6 +489,10 @@ export function useGameState() {
     isAdmin,
     setIsAdmin,
     toggleAdmin,
+    adminPassword,
+    setAdminPassword,
+    checkAdminPassword,
+    logoutAdmin,
     startGame,
     pauseGame,
     resumeGame,

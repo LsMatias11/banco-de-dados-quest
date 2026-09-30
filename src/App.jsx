@@ -51,6 +51,10 @@ export default function App() {
     isAdmin,
     setIsAdmin,
     toggleAdmin,
+    adminPassword,
+    setAdminPassword,
+    checkAdminPassword,
+    logoutAdmin,
     startGame,
     pauseGame,
     resumeGame,
@@ -108,6 +112,10 @@ export default function App() {
         isGamePaused={isGamePaused}
         isAdmin={isAdmin}
         toggleAdmin={toggleAdmin}
+        adminPassword={adminPassword}
+        setAdminPassword={setAdminPassword}
+        checkAdminPassword={checkAdminPassword}
+        logoutAdmin={logoutAdmin}
         onStartGame={startGame}
         onTogglePause={togglePause}
         onStopGame={stopGame}
