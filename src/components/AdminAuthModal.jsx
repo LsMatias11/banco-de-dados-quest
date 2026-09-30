@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Lock, Crown, KeyRound, Check, X, ShieldAlert, LogOut, Sparkles } from 'lucide-react';
 
 export default function AdminAuthModal({
-  isOpen,
+  isOpen = true,
   onClose,
   isAdmin,
   checkAdminPassword,
@@ -23,13 +23,13 @@ export default function AdminAuthModal({
     if (checkAdminPassword(inputPassword)) {
       setErrorMsg('');
       setInputPassword('');
-      setSuccessMsg('Autenticação com Sucesso! Modo Professor Ativo.');
+      setSuccessMsg('Autenticação com Sucesso! Modo Administrador Ativo.');
       setTimeout(() => {
         setSuccessMsg('');
         onClose();
       }, 1200);
     } else {
-      setErrorMsg('Senha incorreta! Apenas o Professor/ADM pode gerenciar a partida.');
+      setErrorMsg('Senha incorreta! Apenas o Administrador pode gerenciar a partida.');
     }
   };
 
@@ -69,7 +69,7 @@ export default function AdminAuthModal({
           </div>
           <div>
             <h3 className="font-display text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              {isAdmin ? 'PAINEL DE SEGURANÇA ADM' : 'AUTENTICAÇÃO DE PROFESSOR'}
+              {isAdmin ? 'PAINEL DE SEGURANÇA ADM' : 'AUTENTICAÇÃO DE ADMINISTRADOR'}
             </h3>
             <p className="text-[11px] text-slate-400 font-medium">
               {isAdmin

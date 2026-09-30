@@ -16,7 +16,7 @@ const INITIAL_TEAMS = [
     color: '#00f5ff',
     badgeClass: 'text-cyan-400 bg-cyan-950 border-cyan-500/40',
     roverName: 'Rover Alfa V2',
-    members: ['Dev1', 'DBA', 'Arq', 'Anl'],
+    members: [],
     position: 1,
     errorCount: 0,
     credits: 1450,
@@ -29,7 +29,7 @@ const INITIAL_TEAMS = [
     color: '#ffb703',
     badgeClass: 'text-amber-400 bg-amber-950 border-amber-500/40',
     roverName: 'Rover Beta V1',
-    members: ['Dev2', 'DBA2', 'Arq2', 'Anl2'],
+    members: [],
     position: 1,
     errorCount: 0,
     credits: 1000,
@@ -42,7 +42,7 @@ const INITIAL_TEAMS = [
     color: '#9d4edd',
     badgeClass: 'text-purple-400 bg-purple-950 border-purple-500/40',
     roverName: 'Rover Gama V1',
-    members: ['Dev3', 'DBA3', 'Arq3', 'Anl3'],
+    members: [],
     position: 1,
     errorCount: 0,
     credits: 1000,
@@ -55,7 +55,7 @@ const INITIAL_TEAMS = [
     color: '#ff007f',
     badgeClass: 'text-pink-400 bg-pink-950 border-pink-500/40',
     roverName: 'Rover Delta V1',
-    members: ['Dev4', 'DBA4', 'Arq4', 'Anl4'],
+    members: [],
     position: 1,
     errorCount: 0,
     credits: 1000,
@@ -71,11 +71,11 @@ export function useGameState() {
   const [activeTeamId, setActiveTeamId] = useState(savedState?.activeTeamId || 'alfa');
   const [turnIndex, setTurnIndex] = useState(savedState?.turnIndex || 1);
 
-  // Controle do ADM / Professor para Partida
+  // Controle do ADM / Administrador para Partida
   const [isGameStarted, setIsGameStarted] = useState(savedState?.isGameStarted || false);
   const [isGamePaused, setIsGamePaused] = useState(savedState?.isGamePaused || false);
 
-  // Modo ADM / Professor vs Modo Aluno (Protegido por Senha '1234')
+  // Modo ADM / Administrador vs Modo Aluno (Protegido por Senha '1234')
   const [adminPassword, setAdminPassword] = useState(savedState?.adminPassword || '1234');
   const [isAdmin, setIsAdmin] = useState(() => {
     if (typeof window !== 'undefined' && (window.location.search.includes('adm=1') || window.location.search.includes('admin=true'))) {
@@ -110,7 +110,7 @@ export function useGameState() {
     parallelLockActive: false
   });
 
-  const [professorName, setProfessorName] = useState(savedState?.professorName || 'Prof. C. J. Date');
+  const [professorName, setProfessorName] = useState(savedState?.professorName || 'Administrador');
 
   // Pergunta & Cronômetro (30s por padrão)
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(savedState?.currentQuestionIdx || 0);

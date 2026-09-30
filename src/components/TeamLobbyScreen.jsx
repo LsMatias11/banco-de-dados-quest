@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Database, Terminal, Users, CheckCircle2, ShieldCheck, Info, Satellite, Volume2, VolumeX, BookOpen, HelpCircle, User } from 'lucide-react';
+import { Database, Terminal, Users, CheckCircle2, ShieldCheck, Info, Satellite, Volume2, VolumeX, BookOpen, HelpCircle, User, Lock, Crown } from 'lucide-react';
+import AdminAuthModal from './AdminAuthModal';
 
 const TEAMS_DATA = [
   {
@@ -9,9 +10,8 @@ const TEAMS_DATA = [
     bgBadge: 'bg-primary-container/20 border-primary-container/40 text-primary-container',
     btnSelected: 'bg-primary-container text-on-primary-fixed shadow-[0_0_15px_rgba(0,240,250,0.5)] font-bold',
     btnUnselected: 'bg-surface-container-highest border border-primary-container/40 text-primary hover:bg-primary-container hover:text-slate-950',
-    slogan: '“Álgebra Relacional & Axiomas Formais C.J. Date”',
     roverTag: 'ROVER CIANO',
-    members: ['LS', 'MK', 'CD', 'TC', 'AR'],
+    members: [],
     maxSlots: 8
   },
   {
@@ -21,9 +21,8 @@ const TEAMS_DATA = [
     bgBadge: 'bg-amber-500/20 border-amber-500/40 text-amber-300',
     btnSelected: 'bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(255,185,95,0.5)] font-bold',
     btnUnselected: 'bg-surface-container-highest border border-amber-500/40 text-amber-300 hover:bg-amber-400 hover:text-slate-950',
-    slogan: '“Normalização Estrutural, Formas Normais & Domínios Atômicos”',
     roverTag: 'ROVER ÂMBAR',
-    members: ['BR', 'GT', 'VL'],
+    members: [],
     maxSlots: 8
   },
   {
@@ -33,9 +32,8 @@ const TEAMS_DATA = [
     bgBadge: 'bg-purple-500/20 border-purple-500/40 text-purple-300',
     btnSelected: 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)] font-bold',
     btnUnselected: 'bg-surface-container-highest border border-purple-500/40 text-purple-300 hover:bg-purple-500 hover:text-white',
-    slogan: '“Controle de Concorrência, Transações Distribuídas & ACID”',
     roverTag: 'ROVER ROXO',
-    members: ['FN', 'EL'],
+    members: [],
     maxSlots: 8
   },
   {
@@ -45,9 +43,8 @@ const TEAMS_DATA = [
     bgBadge: 'bg-pink-500/20 border-pink-500/40 text-pink-300',
     btnSelected: 'bg-pink-500 text-white shadow-[0_0_15px_rgba(255,0,127,0.5)] font-bold',
     btnUnselected: 'bg-surface-container-highest border border-pink-500/40 text-pink-300 hover:bg-pink-500 hover:text-white',
-    slogan: '“Integridade Referencial, Restrições & Triggers”',
     roverTag: 'ROVER MAGENTA',
-    members: ['KR'],
+    members: [],
     maxSlots: 8
   }
 ];
@@ -60,17 +57,30 @@ export default function TeamLobbyScreen({
   onEnterArena,
   isMuted,
   setIsMuted,
-  onOpenRules
+  onOpenRules,
+  isAdmin,
+  toggleAdmin,
+  adminPassword,
+  setAdminPassword,
+  checkAdminPassword,
+  logoutAdmin
 }) {
-  const [nameInput, setNameInput] = useState(studentName || 'Lucas Silva');
+  const [nameInput, setNameInput] = useState(studentName || '');
   const [courseInput, setCourseInput] = useState('Ciência da Computação');
   const [feedbackMsg, setFeedbackMsg] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const selectedTeam = TEAMS_DATA.find((t) => t.id === activeTeamId) || TEAMS_DATA[0];
 
   const handleConnect = () => {
-    if (setStudentName) setStudentName(nameInput || 'Lucas Silva');
-    setFeedbackMsg(`TRANSAÇÃO ACID INICIADA: Autenticando com o servidor de instância relacional de ${nameInput || 'Lucas Silva'}...`);
+    if (!isAdmin) {
+      setShowAuthModal(true);
+      setFeedbackMsg('🔒 Apenas o Administrador pode avançar da tela inicial para a arena! Autentique-se com a senha.');
+      return;
+    }
+
+    if (setStudentName) setStudentName(nameInput.trim() || 'Estudante Sem Nome');
+    setFeedbackMsg(`TRANSAÇÃO ACID INICIADA: Autenticando com o servidor de instância relacional de ${nameInput.trim() || 'Estudante'}...`);
     
     setTimeout(() => {
       setFeedbackMsg('✓ CONEXÃO ESTABELECIDA COM SUCESSO. Entrando na Arena Overworld...');
@@ -133,6 +143,26 @@ export default function TeamLobbyScreen({
           {/* Direita: Controles Utilitários */}
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                if (isAdmin) {
+                  if (logoutAdmin) logoutAdmin();
+                  setFeedbackMsg('🔒 Modo Administrador desativado.');
+                } else {
+                  setShowAuthModal(true);
+                }
+              }}
+              className={`h-9 px-3 rounded-lg border font-mono text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
+                isAdmin
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-bold border-white/40 shadow-glow-emerald'
+                  : 'bg-slate-900 border-amber-500/40 text-amber-300 hover:bg-amber-950'
+              }`}
+              type="button"
+            >
+              {isAdmin ? <Crown className="w-4 h-4 text-slate-950" /> : <Lock className="w-4 h-4 text-amber-400" />}
+              <span className="uppercase font-bold">{isAdmin ? '👑 ADM ATIVO' : '🔒 MODO ADM'}</span>
+            </button>
+
+            <button
               onClick={() => setIsMuted(!isMuted)}
               className="h-9 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-400 transition flex items-center gap-1.5 shadow-sm active:scale-95"
               type="button"
@@ -148,15 +178,6 @@ export default function TeamLobbyScreen({
             >
               <BookOpen className="w-4 h-4 text-cyan-400" />
               <span className="font-mono text-xs hidden sm:inline uppercase">Regras</span>
-            </button>
-
-            <button
-              onClick={onOpenRules}
-              className="h-9 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-400 transition flex items-center gap-1.5 shadow-sm active:scale-95"
-              type="button"
-            >
-              <HelpCircle className="w-4 h-4" />
-              <span className="font-mono text-xs hidden sm:inline uppercase">Ajuda</span>
             </button>
 
             <button
@@ -225,7 +246,7 @@ export default function TeamLobbyScreen({
                       </div>
                       <div className="flex flex-col">
                         <span className="font-display text-sm font-bold text-white tracking-wide">
-                          {nameInput || 'Lucas Silva'}
+                          {nameInput || 'Estudante (Sem nome)'}
                         </span>
                         <span className="font-mono text-[11px] text-slate-400">ID: 2026-REL-8841</span>
                       </div>
@@ -424,6 +445,18 @@ export default function TeamLobbyScreen({
         </div>
       </footer>
 
+      {/* Modal de Autenticação ADM */}
+      {showAuthModal && (
+        <AdminAuthModal
+          isAdmin={isAdmin}
+          toggleAdmin={toggleAdmin}
+          adminPassword={adminPassword}
+          setAdminPassword={setAdminPassword}
+          checkAdminPassword={checkAdminPassword}
+          logoutAdmin={logoutAdmin}
+          onClose={() => setShowAuthModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -200,7 +200,7 @@ export default function Header({
 
         {/* Global Controls & Match Status */}
         <div className="flex items-center gap-2">
-          {/* Botão de Alternar Modo ADM / Professor (Abre Modal de Autenticação) */}
+          {/* Botão de Alternar Modo ADM (Abre Modal de Autenticação) */}
           <button
             onClick={() => setShowAuthModal(true)}
             className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1 transition active:scale-95 ${
@@ -208,7 +208,7 @@ export default function Header({
                 ? 'bg-amber-950/90 text-amber-300 border border-amber-400/60 shadow-glow-gold/30'
                 : 'bg-slate-900/80 text-slate-400 border border-slate-700 hover:text-white'
             }`}
-            title={isAdmin ? 'Modo ADM Ativo (Clique para gerenciar ou sair)' : 'Autenticar no Modo ADM / Professor'}
+            title={isAdmin ? 'Modo ADM Ativo (Clique para gerenciar ou sair)' : 'Autenticar no Modo Administrador'}
           >
             {isAdmin ? <Crown className="w-3.5 h-3.5 text-amber-400" /> : <Lock className="w-3.5 h-3.5 text-slate-400" />}
             <span>{isAdmin ? 'ADM' : 'JOGADOR'}</span>

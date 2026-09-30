@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, CheckCircle2, XCircle, ArrowRight, Play, Pause, ShieldAlert } from 'lucide-react';
+import { BookOpen, CheckCircle2, XCircle, ArrowRight, Play, Pause, ShieldAlert, Lock } from 'lucide-react';
 
 export default function QuizPanel({
   currentQuestion,
@@ -28,6 +28,20 @@ export default function QuizPanel({
         <div className="absolute -top-16 -left-16 w-48 h-48 bg-arcade-cyan/15 rounded-full blur-3xl pointer-events-none"></div>
 
         <div>
+          {/* Active Team Prominent Badge */}
+          <div className="mb-3.5 p-2.5 rounded-xl bg-slate-950 border border-cyan-400/40 flex items-center justify-between gap-2 shadow-inner">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">TURNO ATUAL:</span>
+              <span className="font-display font-black text-xs text-white uppercase tracking-wider">
+                {currentPlayer || 'Equipe Alfa'}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded-md uppercase">
+              RESPONDENDO AGORA
+            </span>
+          </div>
+
           {/* ADM Control Bar & Status Banner */}
           {!isGameStarted ? (
             <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/90 via-slate-900 to-arcade-darkest border-2 border-emerald-400 shadow-glow-emerald/30 flex items-center justify-between gap-3">
@@ -37,10 +51,10 @@ export default function QuizPanel({
                 </div>
                 <div>
                   <h4 className="text-xs font-display font-black text-white uppercase tracking-wider">
-                    SALA AGUARDANDO O PROFESSOR
+                    SALA AGUARDANDO O ADMINISTRADOR
                   </h4>
                   <p className="text-[10px] text-emerald-300 font-medium">
-                    {isAdmin ? "A partida está pronta com 4 equipes. Clique para começar!" : "O professor irá iniciar a partida em breve. Analise o mapa!"}
+                    {isAdmin ? "A partida está pronta com 4 equipes. Clique para começar!" : "O Administrador irá iniciar a partida em breve. Analise o mapa!"}
                   </p>
                 </div>
               </div>
@@ -63,7 +77,7 @@ export default function QuizPanel({
                 </div>
                 <div>
                   <h4 className="text-xs font-display font-black text-amber-300 uppercase tracking-wider">
-                    PARTIDA PAUSADA PELO PROFESSOR
+                    PARTIDA PAUSADA PELO ADMINISTRADOR
                   </h4>
                   <p className="text-[10px] text-slate-300 font-medium">
                     {isAdmin ? "Cronômetro congelado. Clique para retornar ao jogo." : "O cronômetro está pausado para explicações teóricas."}
@@ -213,17 +227,51 @@ export default function QuizPanel({
               );
             })}
           </div>
+
+          {/* Result Feedback Banner */}
+          {isAnswered && (
+            <div className={`mt-3 p-3 rounded-xl border flex items-center gap-3 animate-fade-in ${
+              selectedOption === currentQuestion.correctIndex
+                ? 'bg-emerald-950/80 border-emerald-400 text-emerald-200'
+                : 'bg-red-950/80 border-red-500 text-red-200'
+            }`}>
+              {selectedOption === currentQuestion.correctIndex ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <div className="text-xs">
+                    <strong className="font-bold text-white uppercase block">🎉 RESPOSTA CORRETA!</strong>
+                    <span>A <strong>{currentPlayer || 'Equipe'}</strong> acertou a questão e avançou no Overworld!</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5 text-red-400 shrink-0" />
+                  <div className="text-xs">
+                    <strong className="font-bold text-white uppercase block">❌ RESPOSTA INCORRETA!</strong>
+                    <span>A <strong>{currentPlayer || 'Equipe'}</strong> errou. A opção correta era: <strong className="text-emerald-300 font-mono font-bold font-black">{optionLetters[currentQuestion.correctIndex]}</strong>.</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Action Confirmation CTA (Restored to exact prototype style) */}
+        {/* Action Confirmation CTA */}
         <div className="mt-4 pt-3.5 border-t border-cyan-500/20 flex items-center justify-between gap-3">
-          <button
-            onClick={() => setShowExplanationModal(true)}
-            className="text-[11px] font-mono text-arcade-cyan hover:underline flex items-center gap-1"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            Fundamentação Date
-          </button>
+          {isAnswered ? (
+            <button
+              onClick={() => setShowExplanationModal(true)}
+              className="text-[11px] font-mono text-cyan-300 hover:text-cyan-100 flex items-center gap-1.5 bg-cyan-950/80 border border-cyan-500/40 px-3 py-1.5 rounded-xl transition shadow-glow-cyan/20 cursor-pointer"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Ver Fundamentação Date</span>
+            </button>
+          ) : (
+            <div className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5 bg-slate-950/60 border border-slate-800 px-3 py-1.5 rounded-xl cursor-not-allowed opacity-60" title="Responda a questão para liberar a explicação">
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
+              <span>Fundamentação (Bloqueado)</span>
+            </div>
+          )}
 
           {isAnswered ? (
             <button

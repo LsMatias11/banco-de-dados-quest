@@ -21,7 +21,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState('LOBBY'); // 'LOBBY' or 'GAME'
   const [activeMobileTab, setActiveMobileTab] = useState('quiz');
   const [showDemoBar, setShowDemoBar] = useState(false);
-  const [studentName, setStudentName] = useState('Lucas Silva');
+  const [studentName, setStudentName] = useState('');
 
   const {
     teams,
@@ -70,7 +70,7 @@ export default function App() {
   } = gameState;
 
   const studentData = {
-    p1Name: studentName || activeTeam?.name || 'Lucas Silva',
+    p1Name: studentName || activeTeam?.name || '',
     p1Mat: activeTeam?.roverName || 'Rover Alfa V2',
     professor: professorName
   };
@@ -87,6 +87,12 @@ export default function App() {
         isMuted={isMuted}
         setIsMuted={setIsMuted}
         onOpenRules={() => setShowExplanationModal(true)}
+        isAdmin={isAdmin}
+        toggleAdmin={toggleAdmin}
+        adminPassword={adminPassword}
+        setAdminPassword={setAdminPassword}
+        checkAdminPassword={checkAdminPassword}
+        logoutAdmin={logoutAdmin}
       />
     );
   }
@@ -228,7 +234,7 @@ export default function App() {
           )}
 
           {activeMobileTab === 'map' && (
-            <div className="min-h-[440px]">
+            <div className="min-h-[580px]">
               <OverworldMap
                 teams={teams}
                 activeTeam={activeTeam}

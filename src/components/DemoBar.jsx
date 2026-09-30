@@ -102,7 +102,7 @@ export default function DemoBar({ onDemoAction, studentData, setStudentData }) {
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Professor / Mentor"
+              placeholder="Administrador / Mentor"
               value={profInput}
               onChange={(e) => setProfInput(e.target.value)}
               className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 flex-1"
