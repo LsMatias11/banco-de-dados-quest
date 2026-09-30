@@ -74,7 +74,7 @@ export function useGameState() {
 
   // Sala Online State (Padronizada para BD-MAIN única)
   const [roomCode, setRoomCode] = useState('BD-MAIN');
-  const [isOnlineRoom, setIsOnlineRoom] = useState(savedState?.isOnlineRoom !== undefined ? savedState.isOnlineRoom : true);
+  const [isOnlineRoom, setIsOnlineRoom] = useState(true);
   const [viewMode, setViewMode] = useState(savedState?.viewMode || 'LOBBY'); // 'LOBBY' or 'GAME'
 
   // Refs de controle de sincronização remota (evitam sobreposição/loop)
@@ -122,10 +122,12 @@ export function useGameState() {
 
   const [professorName, setProfessorName] = useState(savedState?.professorName || 'Administrador');
 
-  // Pergunta & Cronômetro (30s por padrão)
+  // Pergunta & Cronômetro sincronizado via timestamp absoluto (timerExpiresAt)
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(savedState?.currentQuestionIdx || 0);
   const [timer, setTimer] = useState(30);
   const [timerActive, setTimerActive] = useState(false);
+  const [timerExpiresAt, setTimerExpiresAt] = useState(null);
+  const [pausedRemaining, setPausedRemaining] = useState(null);
 
   // Estado da Resposta
   const [selectedOption, setSelectedOption] = useState(null);
@@ -258,13 +260,22 @@ const sanitizeMembers = (membersList) => {
         setIsGamePaused(false);
         setTimerActive(true);
         setViewMode('GAME');
+        if (msg.timerExpiresAt) setTimerExpiresAt(msg.timerExpiresAt);
+        if (msg.timer !== undefined) setTimer(msg.timer);
         return;
       }
 
       // 4. AÇÃO: Pausar / Despausar Partida
       if (msg.type === 'PAUSE_GAME') {
-        setIsGamePaused(Boolean(msg.isPaused));
-        setTimerActive(!msg.isPaused);
+        const isPaused = Boolean(msg.isPaused);
+        setIsGamePaused(isPaused);
+        setTimerActive(!isPaused);
+        if (isPaused) {
+          setTimerExpiresAt(null);
+          if (msg.timer !== undefined) setTimer(msg.timer);
+        } else if (msg.timerExpiresAt) {
+          setTimerExpiresAt(msg.timerExpiresAt);
+        }
         return;
       }
 
@@ -273,6 +284,7 @@ const sanitizeMembers = (membersList) => {
         setIsGameStarted(false);
         setIsGamePaused(false);
         setTimerActive(false);
+        setTimerExpiresAt(null);
         return;
       }
 
@@ -283,6 +295,7 @@ const sanitizeMembers = (membersList) => {
         setTurnIndex(1);
         setCurrentQuestionIdx(0);
         setTimer(30);
+        setTimerExpiresAt(null);
         setTimerActive(false);
         setSelectedOption(null);
         setIsAnswered(false);
@@ -310,6 +323,8 @@ const sanitizeMembers = (membersList) => {
       if (remoteState.isAnswered !== undefined) setIsAnswered(remoteState.isAnswered);
       if (remoteState.answerResult !== undefined) setAnswerResult(remoteState.answerResult);
       if (remoteState.winner !== undefined) setWinner(remoteState.winner);
+      if (remoteState.timerExpiresAt !== undefined) setTimerExpiresAt(remoteState.timerExpiresAt);
+      if (remoteState.timer !== undefined && remoteState.isGamePaused) setTimer(remoteState.timer);
     });
 
     return () => unsubscribe();
@@ -525,6 +540,9 @@ const sanitizeMembers = (membersList) => {
       setActiveSabotages((prev) => ({ ...prev, timeoutActive: false }));
     }
     setTimer(newTimer);
+    const expiresAt = Date.now() + newTimer * 1000;
+    setTimerExpiresAt(expiresAt);
+    setPausedRemaining(null);
 
     if (isGameStarted && !isGamePaused) {
       setTimerActive(true);
@@ -539,15 +557,20 @@ const sanitizeMembers = (membersList) => {
         selectedOption: null,
         isAnswered: false,
         answerResult: null,
-        timer: newTimer
+        timer: newTimer,
+        timerExpiresAt: expiresAt
       });
     }
   }, [activeTeamId, activeSabotages.timeoutActive, isGameStarted, isGamePaused, currentQuestionIdx, turnIndex, isOnlineRoom, roomCode]);
 
   const startGame = () => {
+    const expiresAt = Date.now() + 30 * 1000;
     setIsGameStarted(true);
     setIsGamePaused(false);
     setTimerActive(true);
+    setTimer(30);
+    setTimerExpiresAt(expiresAt);
+    setPausedRemaining(null);
     setViewMode('GAME');
 
     if (isOnlineRoom && roomCode) {
@@ -555,7 +578,9 @@ const sanitizeMembers = (membersList) => {
         type: 'START_GAME',
         viewMode: 'GAME',
         isGameStarted: true,
-        isGamePaused: false
+        isGamePaused: false,
+        timer: 30,
+        timerExpiresAt: expiresAt
       });
       publishRoomState(roomCode, {
         type: 'SYNC_STATE',
@@ -569,7 +594,9 @@ const sanitizeMembers = (membersList) => {
         selectedOption,
         isAnswered,
         answerResult,
-        winner
+        winner,
+        timer: 30,
+        timerExpiresAt: expiresAt
       });
     }
   };
@@ -577,10 +604,17 @@ const sanitizeMembers = (membersList) => {
   const pauseGame = () => {
     setIsGamePaused(true);
     setTimerActive(false);
+    const remaining = timerExpiresAt ? Math.max(0, Math.ceil((timerExpiresAt - Date.now()) / 1000)) : timer;
+    setPausedRemaining(remaining);
+    setTimer(remaining);
+    setTimerExpiresAt(null);
+
     if (isOnlineRoom && roomCode) {
       publishRoomState(roomCode, {
         type: 'PAUSE_GAME',
-        isPaused: true
+        isPaused: true,
+        timer: remaining,
+        timerExpiresAt: null
       });
     }
   };
@@ -588,10 +622,17 @@ const sanitizeMembers = (membersList) => {
   const resumeGame = () => {
     setIsGamePaused(false);
     setTimerActive(true);
+    const secs = pausedRemaining !== null ? pausedRemaining : (timer > 0 ? timer : 30);
+    const expiresAt = Date.now() + secs * 1000;
+    setTimerExpiresAt(expiresAt);
+    setPausedRemaining(null);
+
     if (isOnlineRoom && roomCode) {
       publishRoomState(roomCode, {
         type: 'PAUSE_GAME',
-        isPaused: false
+        isPaused: false,
+        timer: secs,
+        timerExpiresAt: expiresAt
       });
     }
   };
@@ -608,6 +649,8 @@ const sanitizeMembers = (membersList) => {
     setIsGameStarted(false);
     setIsGamePaused(false);
     setTimerActive(false);
+    setTimerExpiresAt(null);
+    setPausedRemaining(null);
     if (isOnlineRoom && roomCode) {
       publishRoomState(roomCode, {
         type: 'STOP_GAME'
@@ -615,25 +658,56 @@ const sanitizeMembers = (membersList) => {
     }
   };
 
-  // Cronômetro (só roda se a partida foi iniciada pelo ADM e NÃO está pausada)
+  // Cronômetro Sincronizado por Timestamp Absoluto (timerExpiresAt)
+  // Garante que Edge, Chrome, Safari e Celulares mostrem rigorosamente o MESMO segundo
   useEffect(() => {
-    let interval = null;
-    if (isGameStarted && !isGamePaused && timerActive && timer > 0 && !isAnswered && !winner) {
-      interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
-    } else if (isGameStarted && !isGamePaused && timer === 0 && !isAnswered && !winner) {
-      handleTimeOut();
+    if (!isGameStarted || isGamePaused || !timerActive || isAnswered || winner) {
+      return;
     }
+
+    const interval = setInterval(() => {
+      if (!timerExpiresAt) return;
+      const now = Date.now();
+      const diffMs = timerExpiresAt - now;
+      const remainingSecs = Math.max(0, Math.ceil(diffMs / 1000));
+
+      setTimer((prev) => (prev !== remainingSecs ? remainingSecs : prev));
+
+      if (remainingSecs <= 0) {
+        // Dispara timeout se for ADM ou sala offline
+        // Se for jogador comum, dá 1.5s de tolerância para o sync do ADM chegar antes de forçar o timeout
+        if (isAdmin || !isOnlineRoom || diffMs <= -1500) {
+          handleTimeOut();
+        } else {
+          setTimerActive(false);
+        }
+      }
+    }, 250);
+
     return () => clearInterval(interval);
-  }, [isGameStarted, isGamePaused, timerActive, timer, isAnswered, winner]);
+  }, [isGameStarted, isGamePaused, timerActive, timerExpiresAt, isAnswered, winner, isAdmin, isOnlineRoom, activeTeamId]);
 
   const handleTimeOut = () => {
     setTimerActive(false);
+    setTimerExpiresAt(null);
+    setTimer(0);
     setIsAnswered(true);
-    setAnswerResult({
+    const timeoutResult = {
       isCorrect: false,
       explanation: 'TEMPO ESGOTADO! A transação da equipe excedeu o timeout.'
-    });
+    };
+    setAnswerResult(timeoutResult);
     processError(activeTeamId);
+
+    if (isOnlineRoom && roomCode) {
+      publishRoomState(roomCode, {
+        type: 'SYNC_STATE',
+        isAnswered: true,
+        answerResult: timeoutResult,
+        timer: 0,
+        timerExpiresAt: null
+      });
+    }
   };
 
   // Processar Erro (+1 Erro ou ROLLBACK no 3º)
@@ -665,6 +739,7 @@ const sanitizeMembers = (membersList) => {
     setSelectedOption(optionIndex);
     setIsAnswered(true);
     setTimerActive(false);
+    setTimerExpiresAt(null);
 
     const isCorrect = optionIndex === currentQuestion.correctIndex;
     const result = {
@@ -706,7 +781,8 @@ const sanitizeMembers = (membersList) => {
             selectedOption: optionIndex,
             answerResult: result,
             teams: updated.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
-            winner: winningTeam
+            winner: winningTeam,
+            timerExpiresAt: null
           });
         }
 
@@ -719,7 +795,8 @@ const sanitizeMembers = (membersList) => {
           type: 'SYNC_STATE',
           isAnswered: true,
           selectedOption: optionIndex,
-          answerResult: result
+          answerResult: result,
+          timerExpiresAt: null
         });
       }
     }
@@ -754,7 +831,19 @@ const sanitizeMembers = (membersList) => {
     } else if (cardId === 'PARALLEL_LOCK') {
       alert(`DEADLOCK RELACIONAL LANÇADO (-${cost} PTS)! O próximo turno rival foi congelado.`);
     } else if (cardId === 'RELATIONAL_OVERLOAD') {
-      setTimer((prev) => Math.max(5, prev - 15));
+      const now = Date.now();
+      const currentRemaining = timerExpiresAt ? Math.max(0, Math.ceil((timerExpiresAt - now) / 1000)) : timer;
+      const newRemaining = Math.max(5, currentRemaining - 15);
+      const newExpires = now + newRemaining * 1000;
+      setTimer(newRemaining);
+      setTimerExpiresAt(newExpires);
+      if (isOnlineRoom && roomCode) {
+        publishRoomState(roomCode, {
+          type: 'SYNC_STATE',
+          timer: newRemaining,
+          timerExpiresAt: newExpires
+        });
+      }
       alert(`SOBRECARGA RELACIONAL LANÇADA (-${cost} PTS)! 15s foram drenados do cronômetro rival.`);
     }
   };
@@ -796,6 +885,8 @@ const sanitizeMembers = (membersList) => {
     setCurrentQuestionIdx(0);
     setTimer(30);
     setTimerActive(false);
+    setTimerExpiresAt(null);
+    setPausedRemaining(null);
     setSelectedOption(null);
     setIsAnswered(false);
     setAnswerResult(null);
@@ -818,7 +909,9 @@ const sanitizeMembers = (membersList) => {
         selectedOption: null,
         isAnswered: false,
         answerResult: null,
-        winner: null
+        winner: null,
+        timer: 30,
+        timerExpiresAt: null
       });
     }
   };
@@ -858,6 +951,7 @@ const sanitizeMembers = (membersList) => {
     currentQuestion,
     currentQuestionIdx,
     timer,
+    timerExpiresAt,
     selectedOption,
     isAnswered,
     answerResult,
@@ -887,6 +981,8 @@ const sanitizeMembers = (membersList) => {
     stopGame,
     handleAnswer,
     nextTurn,
+    useSabotageCard,
+    resetGame,
     viewMode,
     setViewMode,
     joinTeamMember,

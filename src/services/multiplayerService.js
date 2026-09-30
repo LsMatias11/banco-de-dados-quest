@@ -1,4 +1,5 @@
 // Service de Sincronização Multiplayer em Tempo Real (PubNub Streaming + History Engine v8)
+// Inclui proteção contra cache agressivo do Microsoft Edge, Safari e Chrome Mobile
 
 /**
  * Converte o código da sala em um nome de canal seguro para a rede PubNub
@@ -21,6 +22,15 @@ export const generateRoomCode = () => {
 };
 
 /**
+ * Headers comuns com desativação total de cache HTTP para compatibilidade com Edge
+ */
+const NO_CACHE_HEADERS = {
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache'
+};
+
+/**
  * Publica uma mensagem / ação na sala online
  */
 export const publishRoomState = async (roomCode, message) => {
@@ -28,14 +38,16 @@ export const publishRoomState = async (roomCode, message) => {
   const channel = getChannelName(roomCode);
   const payload = {
     ...message,
+    msgId: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     lastUpdated: Date.now(),
     timestamp: Date.now()
   };
 
   try {
-    const res = await fetch(`https://ps.pubnub.com/publish/demo/demo/0/${channel}/0`, {
+    const res = await fetch(`https://ps.pubnub.com/publish/demo/demo/0/${channel}/0?_t=${Date.now()}_${Math.random()}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: NO_CACHE_HEADERS,
+      cache: 'no-store',
       body: JSON.stringify(payload)
     });
     return res.ok;
@@ -47,9 +59,10 @@ export const publishRoomState = async (roomCode, message) => {
 
 /**
  * Inscreve um cliente para receber eventos e atualizações instantâneas da sala
+ * - Desativa cache agressivo em navegadores Chromium/Edge/WebKit
  * - Carrega o histórico recente para recuperar membros já conectados
  * - Mantém uma conexão de streaming contínuo (long-polling do PubNub) para latência < 100ms
- * - Inclui polling de segurança a cada 2.5s para 100% de tolerância a oscilações
+ * - Inclui polling de segurança rápido a cada 1.5s com anti-cache para 100% de estabilidade no Edge
  */
 export const subscribeToRoom = (roomCode, onMessage) => {
   if (!roomCode) return () => {};
@@ -67,7 +80,7 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     if (dedupeKey && seenTimestamps.has(dedupeKey)) return;
     if (dedupeKey) {
       seenTimestamps.add(dedupeKey);
-      if (seenTimestamps.size > 200) {
+      if (seenTimestamps.size > 300) {
         const first = seenTimestamps.values().next().value;
         seenTimestamps.delete(first);
       }
@@ -75,10 +88,13 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     onMessage(msg);
   };
 
-  // 1. Carrega histórico recente para recuperar o estado e membros já conectados
+  // 1. Carrega histórico recente para recuperar o estado e membros já conectados (anti-cache)
   const loadHistory = async () => {
     try {
-      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=100`);
+      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=100&_t=${Date.now()}_${Math.random()}`, {
+        headers: NO_CACHE_HEADERS,
+        cache: 'no-store'
+      });
       if (res.ok && isSubscribed) {
         const data = await res.json();
         if (Array.isArray(data) && Array.isArray(data[0])) {
@@ -95,13 +111,17 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     }
   };
 
-  // 2. Loop de Streaming em tempo real (long-poll contínuo)
+  // 2. Loop de Streaming em tempo real (long-poll contínuo com anti-cache)
   const pollStream = async () => {
     while (isSubscribed) {
       try {
         abortController = new AbortController();
-        const url = `https://ps.pubnub.com/subscribe/demo/${channel}/0/${currentTimetoken || '0'}`;
-        const res = await fetch(url, { signal: abortController.signal });
+        const url = `https://ps.pubnub.com/subscribe/demo/${channel}/0/${currentTimetoken || '0'}?_t=${Date.now()}`;
+        const res = await fetch(url, {
+          signal: abortController.signal,
+          headers: NO_CACHE_HEADERS,
+          cache: 'no-store'
+        });
         if (res.ok && isSubscribed) {
           const data = await res.json();
           if (Array.isArray(data) && Array.isArray(data[0])) {
@@ -113,32 +133,38 @@ export const subscribeToRoom = (roomCode, onMessage) => {
             }
           }
         } else {
-          await new Promise((r) => setTimeout(r, 1000));
+          await new Promise((r) => setTimeout(r, 600));
         }
       } catch (err) {
         if (!isSubscribed) break;
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
   };
 
-  // 3. Polling de redundância leve a cada 3s para garantir 100% de integridade
+  // 3. Polling de redundância rápido a cada 1.5s com anti-cache (crucial para o Edge não congelar)
   const redundancyInterval = setInterval(async () => {
     if (!isSubscribed) return;
     try {
-      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=5`);
+      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=15&_t=${Date.now()}_${Math.random()}`, {
+        headers: NO_CACHE_HEADERS,
+        cache: 'no-store'
+      });
       if (res.ok && isSubscribed) {
         const data = await res.json();
         if (Array.isArray(data) && Array.isArray(data[0])) {
           data[0].forEach((msg) => {
             handleMessage(msg);
           });
+          if (data[2]) {
+            currentTimetoken = String(data[2]);
+          }
         }
       }
     } catch (e) {
       // tolerância silenciosa
     }
-  }, 3000);
+  }, 1500);
 
   loadHistory().then(() => {
     if (isSubscribed) {
