@@ -8,6 +8,8 @@ export default function QuizPanel({
   isAnswered,
   answerResult,
   currentPlayer,
+  activeTeam,
+  studentName,
   onAnswer,
   onNextTurn,
   setShowExplanationModal,
@@ -19,6 +21,19 @@ export default function QuizPanel({
 }) {
   const maxTime = 30;
   const optionLetters = ['A', 'B', 'C', 'D'];
+
+  // Verifica se o jogador atual pertence à equipe que está no turno
+  const cleanStudent = (studentName || '').trim().toLowerCase();
+  const isMemberOfActiveTeam = Boolean(
+    cleanStudent &&
+    activeTeam?.members?.some((m) => {
+      const mName = typeof m === 'string' ? m : m?.name;
+      return mName?.trim().toLowerCase() === cleanStudent;
+    })
+  );
+
+  // Somente o jogador da equipe ativa (ou o ADM) pode responder
+  const canTeamAnswer = isMemberOfActiveTeam || isAdmin;
 
   return (
     <section className="h-full flex flex-col" data-purpose="quiz-interface">
@@ -174,18 +189,61 @@ export default function QuizPanel({
             )}
           </div>
 
+          {/* Status do Turno: Quem tem permissão de responder */}
+          {isGameStarted && !isGamePaused && !isAnswered && (
+            <div className={`mb-3 p-3 rounded-xl border flex items-center justify-between gap-2.5 text-xs font-mono shadow-sm transition ${
+              isMemberOfActiveTeam
+                ? 'bg-cyan-950/80 border-cyan-400 text-cyan-200 shadow-glow-cyan/20 ring-1 ring-cyan-400/40'
+                : isAdmin
+                ? 'bg-purple-950/80 border-purple-400/60 text-purple-200'
+                : 'bg-amber-950/80 border-amber-500/50 text-amber-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                {isMemberOfActiveTeam ? (
+                  <>
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping shrink-0"></span>
+                    <span className="font-bold uppercase tracking-wider text-cyan-300">
+                      🎯 É a vez da sua equipe ({activeTeam?.name})! Escolha sua resposta abaixo.
+                    </span>
+                  </>
+                ) : isAdmin ? (
+                  <>
+                    <ShieldAlert className="w-4 h-4 text-purple-400 shrink-0" />
+                    <span className="font-bold text-purple-200">
+                      👑 MODO ADM: Aguardando resposta da {activeTeam?.name || 'Equipe'}.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      Turno exclusivo da <strong className="text-white font-bold">{activeTeam?.name}</strong>. Apenas integrantes dela podem responder!
+                    </span>
+                  </>
+                )}
+              </div>
+              {cleanStudent && (
+                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300 shrink-0 hidden sm:inline">
+                  Você: {studentName}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* 4 Tactical Answer Modules */}
           <div className="space-y-2.5" data-purpose="answer-choices">
             {currentQuestion.options.map((optionText, idx) => {
               const isSelected = selectedOption === idx;
               const isCorrectAnswer = idx === currentQuestion.correctIndex;
-              const canInteract = isGameStarted && !isGamePaused && !isAnswered;
+              const canInteract = isGameStarted && !isGamePaused && !isAnswered && canTeamAnswer;
 
               let cardStyle = "border-slate-700 bg-slate-900/90 hover:border-cyan-400 hover:bg-arcade-surface/60 text-slate-200";
               let btnLetterStyle = "bg-arcade-card border-cyan-400/40 text-cyan-300 group-hover:text-white group-hover:border-cyan-300";
 
               if (!isGameStarted || isGamePaused) {
                 cardStyle = "border-slate-800 bg-slate-950/60 text-slate-400 opacity-75 cursor-not-allowed";
+              } else if (!canTeamAnswer && !isAnswered) {
+                cardStyle = "border-slate-800 bg-slate-950/50 text-slate-500 opacity-60 cursor-not-allowed";
               } else if (isAnswered) {
                 if (isCorrectAnswer) {
                   cardStyle = "border-2 border-emerald-400 bg-gradient-to-r from-emerald-950 via-slate-900 to-arcade-deep shadow-glow-emerald ring-1 ring-emerald-300 text-white font-bold";
@@ -291,15 +349,19 @@ export default function QuizPanel({
             </button>
           ) : (
             <button
-              disabled={selectedOption === null || isGamePaused}
-              onClick={() => selectedOption !== null && onAnswer(selectedOption)}
+              disabled={selectedOption === null || isGamePaused || !canTeamAnswer}
+              onClick={() => selectedOption !== null && canTeamAnswer && onAnswer(selectedOption)}
               className={`relative group px-6 py-2.5 rounded-2xl font-display text-xs font-black tracking-wider uppercase text-slate-950 transition-all transform flex items-center gap-2.5 border border-white/40 ${
-                selectedOption !== null && !isGamePaused
+                selectedOption !== null && !isGamePaused && canTeamAnswer
                   ? 'bg-gradient-to-r from-arcade-emerald via-arcade-cyan to-teal-300 hover:from-teal-300 hover:to-arcade-emerald shadow-glow-cyan cursor-pointer active:scale-95'
                   : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60 border-slate-700'
               }`}
             >
-              <span>CONFIRMAR DECISÃO DA EQUIPE</span>
+              <span>
+                {!canTeamAnswer
+                  ? `AGUARDANDO A ${(activeTeam?.name || 'OUTRA EQUIPE').toUpperCase()}`
+                  : 'CONFIRMAR DECISÃO DA EQUIPE'}
+              </span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition" />
             </button>
           )}

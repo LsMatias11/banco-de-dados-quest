@@ -132,7 +132,7 @@ export default function TeamLobbyScreen({
 
   // Botão principal de ação no rodapé
   const handleMainAction = () => {
-    // Se for o Administrador/Professor, inicia a partida para todo mundo
+    // Se for o Administrador (ADM), inicia a partida para todo mundo
     if (isAdmin) {
       setFeedbackMsg('🚀 INICIANDO PARTIDA: Transição para a Arena Overworld...');
       setTimeout(() => {
@@ -153,8 +153,8 @@ export default function TeamLobbyScreen({
       return;
     }
 
-    // Se o Aluno já estiver conectado na equipe, avisa que está aguardando o professor
-    setFeedbackMsg(`⏳ Você já está na ${userCurrentTeam.name}! Aguarde o Professor / ADM iniciar a partida.`);
+    // Se o Aluno já estiver conectado na equipe, avisa que está aguardando o ADM
+    setFeedbackMsg(`⏳ Você já está na ${userCurrentTeam.name}! Aguarde o ADM iniciar a partida.`);
   };
 
   const getInitials = (str) => {
@@ -572,13 +572,13 @@ export default function TeamLobbyScreen({
                 <Satellite className="w-6 h-6 text-slate-950" />
                 <span>INICIAR PARTIDA & ABRIR ARENA PARA TODOS OS ALUNOS</span>
                 <span className="font-mono text-xs bg-slate-950/20 border border-slate-950/30 px-2.5 py-1 rounded text-slate-950 ml-1 font-bold">
-                  [MODO PROFESSOR]
+                  [MODO ADM]
                 </span>
               </>
             ) : userCurrentTeam ? (
               <>
                 <CheckCircle2 className="w-6 h-6 text-emerald-400 animate-pulse" />
-                <span>VOCÊ ESTÁ NA {userCurrentTeam.name.toUpperCase()} • AGUARDANDO O PROFESSOR INICIAR A ARENA...</span>
+                <span>VOCÊ ESTÁ NA {userCurrentTeam.name.toUpperCase()} • AGUARDANDO O ADM INICIAR A ARENA...</span>
               </>
             ) : (
               <>

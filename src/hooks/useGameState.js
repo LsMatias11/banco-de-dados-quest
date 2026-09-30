@@ -323,8 +323,18 @@ const sanitizeMembers = (membersList) => {
       if (remoteState.isAnswered !== undefined) setIsAnswered(remoteState.isAnswered);
       if (remoteState.answerResult !== undefined) setAnswerResult(remoteState.answerResult);
       if (remoteState.winner !== undefined) setWinner(remoteState.winner);
-      if (remoteState.timerExpiresAt !== undefined) setTimerExpiresAt(remoteState.timerExpiresAt);
-      if (remoteState.timer !== undefined && remoteState.isGamePaused) setTimer(remoteState.timer);
+      if (remoteState.timerExpiresAt !== undefined) {
+        setTimerExpiresAt(remoteState.timerExpiresAt);
+        if (remoteState.timerExpiresAt) {
+          const remainingSecs = Math.max(0, Math.ceil((remoteState.timerExpiresAt - Date.now()) / 1000));
+          setTimer(remainingSecs);
+          setTimerActive(true);
+        } else if (remoteState.timer !== undefined) {
+          setTimer(remoteState.timer);
+        }
+      } else if (remoteState.timer !== undefined && remoteState.isGamePaused) {
+        setTimer(remoteState.timer);
+      }
     });
 
     return () => unsubscribe();
@@ -525,14 +535,11 @@ const sanitizeMembers = (membersList) => {
     setCurrentQuestionIdx(nextQIdx);
     setTurnIndex(nextTurnIdx);
 
-    let nextTeamId = activeTeamId;
-    setTeams((prevTeams) => {
-      const currentIdx = prevTeams.findIndex((t) => t.id === activeTeamId);
-      const nIdx = (currentIdx + 1) % prevTeams.length;
-      nextTeamId = prevTeams[nIdx].id;
-      setActiveTeamId(nextTeamId);
-      return prevTeams;
-    });
+    const teamList = teams && teams.length > 0 ? teams : INITIAL_TEAMS;
+    const currentIdx = teamList.findIndex((t) => t.id === activeTeamId);
+    const nIdx = currentIdx >= 0 ? (currentIdx + 1) % teamList.length : 0;
+    const nextTeamId = teamList[nIdx].id;
+    setActiveTeamId(nextTeamId);
 
     let newTimer = 30;
     if (activeSabotages.timeoutActive) {
@@ -561,7 +568,7 @@ const sanitizeMembers = (membersList) => {
         timerExpiresAt: expiresAt
       });
     }
-  }, [activeTeamId, activeSabotages.timeoutActive, isGameStarted, isGamePaused, currentQuestionIdx, turnIndex, isOnlineRoom, roomCode]);
+  }, [teams, activeTeamId, activeSabotages.timeoutActive, isGameStarted, isGamePaused, currentQuestionIdx, turnIndex, isOnlineRoom, roomCode]);
 
   const startGame = () => {
     const expiresAt = Date.now() + 30 * 1000;
@@ -661,31 +668,31 @@ const sanitizeMembers = (membersList) => {
   // Cronômetro Sincronizado por Timestamp Absoluto (timerExpiresAt)
   // Garante que Edge, Chrome, Safari e Celulares mostrem rigorosamente o MESMO segundo
   useEffect(() => {
-    if (!isGameStarted || isGamePaused || !timerActive || isAnswered || winner) {
+    if (!isGameStarted || isGamePaused || isAnswered || winner || !timerExpiresAt) {
       return;
     }
 
-    const interval = setInterval(() => {
-      if (!timerExpiresAt) return;
+    const updateTimer = () => {
       const now = Date.now();
       const diffMs = timerExpiresAt - now;
       const remainingSecs = Math.max(0, Math.ceil(diffMs / 1000));
-
       setTimer((prev) => (prev !== remainingSecs ? remainingSecs : prev));
 
       if (remainingSecs <= 0) {
         // Dispara timeout se for ADM ou sala offline
-        // Se for jogador comum, dá 1.5s de tolerância para o sync do ADM chegar antes de forçar o timeout
         if (isAdmin || !isOnlineRoom || diffMs <= -1500) {
           handleTimeOut();
         } else {
           setTimerActive(false);
         }
       }
-    }, 250);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 250);
 
     return () => clearInterval(interval);
-  }, [isGameStarted, isGamePaused, timerActive, timerExpiresAt, isAnswered, winner, isAdmin, isOnlineRoom, activeTeamId]);
+  }, [isGameStarted, isGamePaused, timerExpiresAt, isAnswered, winner, isAdmin, isOnlineRoom, activeTeamId]);
 
   const handleTimeOut = () => {
     setTimerActive(false);

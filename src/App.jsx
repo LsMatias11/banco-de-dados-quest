@@ -20,7 +20,19 @@ export default function App() {
   const gameState = useGameState();
   const [activeMobileTab, setActiveMobileTab] = useState('quiz');
   const [showDemoBar, setShowDemoBar] = useState(false);
-  const [studentName, setStudentName] = useState('');
+  const [studentName, setStudentName] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('bd_quest_student_name') || '';
+    }
+    return '';
+  });
+
+  const handleSetStudentName = (name) => {
+    setStudentName(name);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bd_quest_student_name', name || '');
+    }
+  };
 
   const {
     teams,
@@ -89,7 +101,7 @@ export default function App() {
         activeTeamId={activeTeamId}
         setActiveTeamId={setActiveTeamId}
         studentName={studentName}
-        setStudentName={setStudentName}
+        setStudentName={handleSetStudentName}
         onEnterArena={() => {
           setViewMode('GAME');
           startGame();
@@ -201,6 +213,8 @@ export default function App() {
               isAnswered={isAnswered}
               answerResult={answerResult}
               currentPlayer={activeTeam?.name}
+              activeTeam={activeTeam}
+              studentName={studentName}
               onAnswer={handleAnswer}
               onNextTurn={nextTurn}
               setShowExplanationModal={setShowExplanationModal}
@@ -243,6 +257,8 @@ export default function App() {
                 isAnswered={isAnswered}
                 answerResult={answerResult}
                 currentPlayer={activeTeam?.name}
+                activeTeam={activeTeam}
+                studentName={studentName}
                 onAnswer={handleAnswer}
                 onNextTurn={nextTurn}
                 setShowExplanationModal={setShowExplanationModal}
