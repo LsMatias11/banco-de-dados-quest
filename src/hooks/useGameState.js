@@ -174,19 +174,32 @@ const sanitizeMembers = (membersList) => {
   return unique;
 };
 
+  const mergeTeamData = (remoteTeams) => {
+    if (!Array.isArray(remoteTeams) || remoteTeams.length === 0) return INITIAL_TEAMS;
+    return INITIAL_TEAMS.map((initTeam) => {
+      const remote = remoteTeams.find((r) => r && (r.id === initTeam.id || r.name === initTeam.name));
+      if (!remote) return initTeam;
+      return {
+        ...initTeam,
+        ...remote,
+        members: sanitizeMembers(remote.members || initTeam.members),
+        credits: typeof remote.credits === 'number' ? remote.credits : initTeam.credits,
+        position: typeof remote.position === 'number' ? remote.position : initTeam.position,
+        errorCount: typeof remote.errorCount === 'number' ? remote.errorCount : initTeam.errorCount,
+        sabotages: Array.isArray(remote.sabotages) ? remote.sabotages : initTeam.sabotages,
+        bingoGrid: Array.isArray(remote.bingoGrid) ? remote.bingoGrid : initTeam.bingoGrid
+      };
+    });
+  };
+
   // Assinar atualizações remotas do jogo global em tempo real
   useEffect(() => {
     const unsubscribe = subscribeToRoom('GLOBAL', (remoteState) => {
-      if (!remoteState) return;
+      if (!remoteState || typeof remoteState !== 'object') return;
 
       if (remoteState.viewMode) setViewMode(remoteState.viewMode);
       if (remoteState.teams) {
-        setTeams(
-          remoteState.teams.map((t) => ({
-            ...t,
-            members: sanitizeMembers(t.members)
-          }))
-        );
+        setTeams(mergeTeamData(remoteState.teams));
       }
       if (remoteState.activeTeamId) setActiveTeamId(remoteState.activeTeamId);
       if (remoteState.turnIndex !== undefined) setTurnIndex(remoteState.turnIndex);
