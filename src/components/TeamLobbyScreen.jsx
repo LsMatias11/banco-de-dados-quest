@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Database, Terminal, Users, CheckCircle2, ShieldCheck, Info, Satellite, Volume2, VolumeX, BookOpen, HelpCircle, User, Lock, Crown, Globe } from 'lucide-react';
 import AdminAuthModal from './AdminAuthModal';
 import OnlineRoomModal from './OnlineRoomModal';
@@ -77,6 +77,7 @@ export default function TeamLobbyScreen({
   const [feedbackMsg, setFeedbackMsg] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
+  const prevNameRef = useRef(studentName || '');
 
   const displayTeams = TEAMS_DATA.map((staticTeam) => {
     const dynamicTeam = (teams || []).find((t) => t.id === staticTeam.id) || staticTeam;
@@ -92,11 +93,17 @@ export default function TeamLobbyScreen({
 
   const handleSelectTeam = (teamId) => {
     setActiveTeamId(teamId);
-    if (setStudentName && nameInput.trim()) {
-      setStudentName(nameInput.trim());
+    const cleanName = nameInput.trim();
+    if (setStudentName && cleanName) {
+      setStudentName(cleanName);
     }
-    if (joinTeamMember && nameInput.trim()) {
-      joinTeamMember({ teamId, studentName: nameInput.trim() });
+    if (joinTeamMember && cleanName.length >= 2) {
+      joinTeamMember({
+        teamId,
+        studentName: cleanName,
+        previousName: prevNameRef.current
+      });
+      prevNameRef.current = cleanName;
     }
   };
 
@@ -107,11 +114,17 @@ export default function TeamLobbyScreen({
       return;
     }
 
-    if (setStudentName) setStudentName(nameInput.trim() || 'Estudante Sem Nome');
-    if (joinTeamMember && nameInput.trim()) {
-      joinTeamMember({ teamId: activeTeamId, studentName: nameInput.trim() });
+    const cleanName = nameInput.trim();
+    if (setStudentName) setStudentName(cleanName || 'Estudante Sem Nome');
+    if (joinTeamMember && cleanName.length >= 2) {
+      joinTeamMember({
+        teamId: activeTeamId,
+        studentName: cleanName,
+        previousName: prevNameRef.current
+      });
+      prevNameRef.current = cleanName;
     }
-    setFeedbackMsg(`TRANSAÇÃO ACID INICIADA: Autenticando com o servidor de instância relacional de ${nameInput.trim() || 'Estudante'}...`);
+    setFeedbackMsg(`TRANSAÇÃO ACID INICIADA: Autenticando com o servidor de instância relacional de ${cleanName || 'Estudante'}...`);
     
     setTimeout(() => {
       setFeedbackMsg('✓ CONEXÃO ESTABELECIDA COM SUCESSO. Entrando na Arena Overworld...');
@@ -222,15 +235,6 @@ export default function TeamLobbyScreen({
             >
               <BookOpen className="w-4 h-4 text-cyan-400" />
               <span className="font-mono text-xs hidden sm:inline uppercase">Regras</span>
-            </button>
-
-            <button
-              onClick={handleConnect}
-              className="h-9 px-3.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-cyan-400/30 text-cyan-300 hover:text-white transition flex items-center gap-1.5 shadow-sm active:scale-95"
-              type="button"
-            >
-              <User className="w-4 h-4 text-cyan-400" />
-              <span className="font-mono text-xs uppercase font-bold">Entrar como Convidado</span>
             </button>
           </div>
         </div>

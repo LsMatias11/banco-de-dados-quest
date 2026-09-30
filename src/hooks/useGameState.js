@@ -218,28 +218,37 @@ const sanitizeMembers = (membersList) => {
     }
   }, [viewMode, teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, isOnlineRoom, roomCode]);
 
-  // Função para cadastrar / associar membro a uma equipe
+  // Função para cadastrar / associar membro a uma equipe (substitui nome antigo se editado)
   const joinTeamMember = useCallback(({ teamId, studentName, previousName }) => {
     if (!studentName || studentName.trim().length < 2) return;
     const cleanName = studentName.trim();
+    const prevClean = previousName ? previousName.trim() : null;
 
     setTeams((prevTeams) =>
       prevTeams.map((team) => {
         let currentMembers = sanitizeMembers(team.members);
 
-        // Se o usuario tinha um rascunho anterior de nome, remove
-        if (previousName && previousName.trim()) {
-          currentMembers = currentMembers.filter((m) => m !== previousName.trim());
+        // Remove o nome anterior do usuario de TODAS as equipes se ele trocou de nome
+        if (prevClean && prevClean !== cleanName) {
+          currentMembers = currentMembers.filter(
+            (m) => (typeof m === 'string' ? m : m.name) !== prevClean
+          );
         }
 
         if (team.id === teamId) {
-          // Se o nome completo limpo ainda nao esta na equipe, adiciona
-          if (!currentMembers.includes(cleanName) && currentMembers.length < 8) {
-            currentMembers = [...currentMembers, cleanName];
+          // Garante que nao duplica o novo nome
+          currentMembers = currentMembers.filter(
+            (m) => (typeof m === 'string' ? m : m.name) !== cleanName
+          );
+
+          if (currentMembers.length < 8) {
+            currentMembers.push(cleanName);
           }
         } else {
-          // Remove de outras equipes para manter 1 usuario por equipe
-          currentMembers = currentMembers.filter((m) => m !== cleanName);
+          // Remove de outras equipes para manter 1 usuario em apenas 1 equipe
+          currentMembers = currentMembers.filter(
+            (m) => (typeof m === 'string' ? m : m.name) !== cleanName
+          );
         }
 
         return { ...team, members: currentMembers };
