@@ -174,14 +174,12 @@ const sanitizeMembers = (membersList) => {
   return unique;
 };
 
-// Assinar atualizações remotas da sala online
+  // Assinar atualizações remotas da sala online
   useEffect(() => {
     if (!isOnlineRoom || !roomCode) return;
 
     const unsubscribe = subscribeToRoom(roomCode, (remoteState) => {
       if (!remoteState) return;
-
-      isRemoteUpdateRef.current = true;
 
       if (remoteState.viewMode) setViewMode(remoteState.viewMode);
       if (remoteState.teams) {
@@ -206,43 +204,14 @@ const sanitizeMembers = (membersList) => {
     return () => unsubscribe();
   }, [roomCode, isOnlineRoom]);
 
-  // Sincronizar estado com a nuvem quando alterado localmente
-  useEffect(() => {
-    if (isRemoteUpdateRef.current) {
-      isRemoteUpdateRef.current = false;
-      return;
-    }
-
-    if (!isInitialMountRef.current) {
-      isInitialMountRef.current = true;
-      return; // Evita sobrescrever o estado da sala na nuvem com o estado padrão local no primeiro carregamento
-    }
-
-    if (isOnlineRoom && roomCode) {
-      publishRoomState(roomCode, {
-        viewMode,
-        teams: teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
-        activeTeamId,
-        turnIndex,
-        isGameStarted,
-        isGamePaused,
-        currentQuestionIdx,
-        selectedOption,
-        isAnswered,
-        answerResult,
-        winner
-      });
-    }
-  }, [viewMode, teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, isOnlineRoom, roomCode]);
-
   // Função para cadastrar / associar membro a uma equipe (substitui nome antigo se editado)
   const joinTeamMember = useCallback(({ teamId, studentName, previousName }) => {
     if (!studentName || studentName.trim().length < 2) return;
     const cleanName = studentName.trim();
     const prevClean = previousName ? previousName.trim() : null;
 
-    setTeams((prevTeams) =>
-      prevTeams.map((team) => {
+    setTeams((prevTeams) => {
+      const updatedTeams = prevTeams.map((team) => {
         let currentMembers = sanitizeMembers(team.members);
 
         // Remove o nome anterior do usuario de TODAS as equipes se ele trocou de nome
@@ -269,17 +238,35 @@ const sanitizeMembers = (membersList) => {
         }
 
         return { ...team, members: currentMembers };
-      })
-    );
-  }, []);
+      });
+
+      if (isOnlineRoom && roomCode) {
+        publishRoomState(roomCode, {
+          viewMode,
+          teams: updatedTeams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+          activeTeamId,
+          turnIndex,
+          isGameStarted,
+          isGamePaused,
+          currentQuestionIdx,
+          selectedOption,
+          isAnswered,
+          answerResult,
+          winner
+        });
+      }
+
+      return updatedTeams;
+    });
+  }, [isOnlineRoom, roomCode, viewMode, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner]);
 
   // Remover membro de uma equipe (Exclusivo para Administrador)
   const removeTeamMember = useCallback(({ teamId, studentName }) => {
     if (!studentName) return;
     const cleanName = studentName.trim();
 
-    setTeams((prevTeams) =>
-      prevTeams.map((team) => {
+    setTeams((prevTeams) => {
+      const updatedTeams = prevTeams.map((team) => {
         if (team.id !== teamId) return team;
         return {
           ...team,
@@ -287,9 +274,27 @@ const sanitizeMembers = (membersList) => {
             (m) => (typeof m === 'string' ? m : m.name) !== cleanName
           )
         };
-      })
-    );
-  }, []);
+      });
+
+      if (isOnlineRoom && roomCode) {
+        publishRoomState(roomCode, {
+          viewMode,
+          teams: updatedTeams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+          activeTeamId,
+          turnIndex,
+          isGameStarted,
+          isGamePaused,
+          currentQuestionIdx,
+          selectedOption,
+          isAnswered,
+          answerResult,
+          winner
+        });
+      }
+
+      return updatedTeams;
+    });
+  }, [isOnlineRoom, roomCode, viewMode, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner]);
 
   const createOnlineRoom = () => {
     const newCode = generateRoomCode();
@@ -431,6 +436,23 @@ const sanitizeMembers = (membersList) => {
     setIsGameStarted(true);
     setIsGamePaused(false);
     setTimerActive(true);
+    setViewMode('GAME');
+
+    if (isOnlineRoom && roomCode) {
+      publishRoomState(roomCode, {
+        viewMode: 'GAME',
+        teams: teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+        activeTeamId,
+        turnIndex,
+        isGameStarted: true,
+        isGamePaused: false,
+        currentQuestionIdx,
+        selectedOption,
+        isAnswered,
+        answerResult,
+        winner
+      });
+    }
   };
 
   const pauseGame = () => {
@@ -620,6 +642,23 @@ const sanitizeMembers = (membersList) => {
     setAnswerResult(null);
     setWinner(null);
     setRollbackAlert(null);
+    setViewMode('LOBBY');
+
+    if (isOnlineRoom && roomCode) {
+      publishRoomState(roomCode, {
+        viewMode: 'LOBBY',
+        teams: INITIAL_TEAMS,
+        activeTeamId: 'alfa',
+        turnIndex: 1,
+        isGameStarted: false,
+        isGamePaused: false,
+        currentQuestionIdx: 0,
+        selectedOption: null,
+        isAnswered: false,
+        answerResult: null,
+        winner: null
+      });
+    }
   };
 
   // Ações da Barra de Apresentação

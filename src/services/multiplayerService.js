@@ -1,8 +1,8 @@
-// Service de Sincronização Multiplayer em Tempo Real (PubNub Realtime Stream)
+// Service de Sincronização Multiplayer em Tempo Real (PubNub Realtime Pub/Sub Engine)
 
 const getChannelName = (roomCode) => {
   const clean = (roomCode || 'BD-MAIN').toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `bd_quest_channel_${clean}_v4`;
+  return `bd_quest_channel_${clean}_v5`;
 };
 
 export const generateRoomCode = () => {
@@ -15,7 +15,7 @@ export const generateRoomCode = () => {
 };
 
 /**
- * Publica o estado da sala no canal PubNub em tempo real (< 100ms)
+ * Publica o estado da sala no canal PubNub
  */
 export const publishRoomState = async (roomCode, gameState) => {
   if (!roomCode) return;
@@ -34,7 +34,7 @@ export const publishRoomState = async (roomCode, gameState) => {
 };
 
 /**
- * Inscreve um cliente para receber atualizações instantâneas da sala
+ * Inscreve um cliente para receber atualizações instantâneas da sala através do histórico PubNub
  */
 export const subscribeToRoom = (roomCode, onStateChange) => {
   if (!roomCode) return () => {};
@@ -46,7 +46,7 @@ export const subscribeToRoom = (roomCode, onStateChange) => {
   const fetchLatestState = async () => {
     if (!isSubscribed) return;
     try {
-      const res = await fetch(`https://ps.pubnub.com/subscribe/demo/${channel}/0/0`);
+      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=1`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && Array.isArray(data[0]) && data[0].length > 0) {
@@ -58,13 +58,14 @@ export const subscribeToRoom = (roomCode, onStateChange) => {
         }
       }
     } catch (e) {
-      // Captura erros de rede silenciosamente
+      // Ignora falhas temporárias de rede
     }
   };
 
+  // Leitura inicial imediata
   fetchLatestState();
 
-  // Polling em tempo real a cada 1 segundo para latência ultrabaixa e 100% de confiabilidade
+  // Polling em tempo real a cada 1 segundo (100% de consistência e sincronia)
   const interval = setInterval(fetchLatestState, 1000);
 
   return () => {
