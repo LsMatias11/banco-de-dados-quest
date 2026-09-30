@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Database, Terminal, Users, CheckCircle2, ShieldCheck, Info, Satellite, Volume2, VolumeX, BookOpen, HelpCircle, User, Lock, Crown, Globe } from 'lucide-react';
+import { Database, Terminal, Users, CheckCircle2, ShieldCheck, Info, Satellite, Volume2, VolumeX, BookOpen, HelpCircle, User, Lock, Crown, Globe, ArrowRight, Sparkles } from 'lucide-react';
 import AdminAuthModal from './AdminAuthModal';
 import OnlineRoomModal from './OnlineRoomModal';
 
@@ -8,9 +8,9 @@ const TEAMS_DATA = [
     id: 'alfa',
     name: 'Equipe Alfa',
     color: '#00f5ff',
-    bgBadge: 'bg-primary-container/20 border-primary-container/40 text-primary-container',
-    btnSelected: 'bg-primary-container text-on-primary-fixed shadow-[0_0_15px_rgba(0,240,255,0.5)] font-bold',
-    btnUnselected: 'bg-surface-container-highest border border-primary-container/40 text-primary hover:bg-primary-container hover:text-slate-950',
+    bgBadge: 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300',
+    btnSelected: 'bg-cyan-400 text-slate-950 shadow-[0_0_15px_rgba(0,245,255,0.5)] font-bold',
+    btnUnselected: 'bg-slate-900 border border-cyan-400/40 text-cyan-300 hover:bg-cyan-400 hover:text-slate-950',
     roverTag: 'ROVER CIANO',
     members: [],
     maxSlots: 8
@@ -21,7 +21,7 @@ const TEAMS_DATA = [
     color: '#ffb95f',
     bgBadge: 'bg-amber-500/20 border-amber-500/40 text-amber-300',
     btnSelected: 'bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(255,185,95,0.5)] font-bold',
-    btnUnselected: 'bg-surface-container-highest border border-amber-500/40 text-amber-300 hover:bg-amber-400 hover:text-slate-950',
+    btnUnselected: 'bg-slate-900 border border-amber-500/40 text-amber-300 hover:bg-amber-400 hover:text-slate-950',
     roverTag: 'ROVER ÂMBAR',
     members: [],
     maxSlots: 8
@@ -32,7 +32,7 @@ const TEAMS_DATA = [
     color: '#a855f7',
     bgBadge: 'bg-purple-500/20 border-purple-500/40 text-purple-300',
     btnSelected: 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)] font-bold',
-    btnUnselected: 'bg-surface-container-highest border border-purple-500/40 text-purple-300 hover:bg-purple-500 hover:text-white',
+    btnUnselected: 'bg-slate-900 border border-purple-500/40 text-purple-300 hover:bg-purple-500 hover:text-white',
     roverTag: 'ROVER ROXO',
     members: [],
     maxSlots: 8
@@ -43,7 +43,7 @@ const TEAMS_DATA = [
     color: '#ff007f',
     bgBadge: 'bg-pink-500/20 border-pink-500/40 text-pink-300',
     btnSelected: 'bg-pink-500 text-white shadow-[0_0_15px_rgba(255,0,127,0.5)] font-bold',
-    btnUnselected: 'bg-surface-container-highest border border-pink-500/40 text-pink-300 hover:bg-pink-500 hover:text-white',
+    btnUnselected: 'bg-slate-900 border border-pink-500/40 text-pink-300 hover:bg-pink-500 hover:text-white',
     roverTag: 'ROVER MAGENTA',
     members: [],
     maxSlots: 8
@@ -79,6 +79,7 @@ export default function TeamLobbyScreen({
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
   const prevNameRef = useRef(studentName || '');
+  const nameInputRef = useRef(null);
 
   const displayTeams = TEAMS_DATA.map((staticTeam) => {
     const dynamicTeam = (teams || []).find((t) => t.id === staticTeam.id) || staticTeam;
@@ -92,13 +93,31 @@ export default function TeamLobbyScreen({
   const totalSlotsUsed = displayTeams.reduce((sum, t) => sum + (t.members?.length || 0), 0);
   const totalSlotsAvailable = 32 - totalSlotsUsed;
 
-  const handleSelectTeam = (teamId) => {
-    setActiveTeamId(teamId);
+  const currentCleanName = (nameInput || studentName || '').trim();
+
+  // Verifica em qual equipe o aluno está atualmente registrado
+  const userCurrentTeam = currentCleanName
+    ? displayTeams.find((t) =>
+        (t.members || []).some((m) => {
+          const mName = typeof m === 'string' ? m : m?.name;
+          return mName?.toLowerCase() === currentCleanName.toLowerCase();
+        })
+      )
+    : null;
+
+  // Função central para entrar / associar-se a uma equipe
+  const handleJoinTeam = (teamId) => {
     const cleanName = nameInput.trim();
-    if (setStudentName && cleanName) {
-      setStudentName(cleanName);
+    if (!cleanName || cleanName.length < 2) {
+      setFeedbackMsg('⚠️ Digite seu nome / alias acima (mínimo 2 letras) para entrar na equipe!');
+      if (nameInputRef.current) nameInputRef.current.focus();
+      return;
     }
-    if (joinTeamMember && cleanName.length >= 2) {
+
+    setActiveTeamId(teamId);
+    if (setStudentName) setStudentName(cleanName);
+
+    if (joinTeamMember) {
       joinTeamMember({
         teamId,
         studentName: cleanName,
@@ -106,33 +125,36 @@ export default function TeamLobbyScreen({
       });
       prevNameRef.current = cleanName;
     }
+
+    const teamObj = displayTeams.find((t) => t.id === teamId);
+    setFeedbackMsg(`✓ Conectado na ${teamObj?.name || 'Equipe'} como "${cleanName}"!`);
   };
 
-  const handleConnect = () => {
-    if (!isAdmin) {
-      setShowAuthModal(true);
-      setFeedbackMsg('🔒 Apenas o Administrador pode avançar da tela inicial para a arena! Autentique-se com a senha.');
+  // Botão principal de ação no rodapé
+  const handleMainAction = () => {
+    // Se for o Administrador/Professor, inicia a partida para todo mundo
+    if (isAdmin) {
+      setFeedbackMsg('🚀 INICIANDO PARTIDA: Transição para a Arena Overworld...');
+      setTimeout(() => {
+        onEnterArena();
+      }, 400);
       return;
     }
 
-    const cleanName = nameInput.trim();
-    if (setStudentName) setStudentName(cleanName || 'Estudante Sem Nome');
-    if (joinTeamMember && cleanName.length >= 2) {
-      joinTeamMember({
-        teamId: activeTeamId,
-        studentName: cleanName,
-        previousName: prevNameRef.current
-      });
-      prevNameRef.current = cleanName;
+    // Se for um Aluno e ainda não entrou em uma equipe
+    if (!userCurrentTeam) {
+      const cleanName = nameInput.trim();
+      if (!cleanName || cleanName.length < 2) {
+        setFeedbackMsg('⚠️ Digite seu nome / alias no campo acima e confirme sua equipe!');
+        if (nameInputRef.current) nameInputRef.current.focus();
+        return;
+      }
+      handleJoinTeam(activeTeamId);
+      return;
     }
-    setFeedbackMsg(`TRANSAÇÃO ACID INICIADA: Autenticando com o servidor de instância relacional de ${cleanName || 'Estudante'}...`);
-    
-    setTimeout(() => {
-      setFeedbackMsg('✓ CONEXÃO ESTABELECIDA COM SUCESSO. Entrando na Arena Overworld...');
-      setTimeout(() => {
-        onEnterArena();
-      }, 500);
-    }, 800);
+
+    // Se o Aluno já estiver conectado na equipe, avisa que está aguardando o professor
+    setFeedbackMsg(`⏳ Você já está na ${userCurrentTeam.name}! Aguarde o Professor / ADM iniciar a partida.`);
   };
 
   const getInitials = (str) => {
@@ -171,19 +193,35 @@ export default function TeamLobbyScreen({
 
           {/* Centro: Status de Rede e Telemetria */}
           <div className="hidden xl:flex items-center gap-3 bg-slate-950/80 border border-slate-800 px-4 py-1.5 rounded-full font-mono text-xs text-slate-300 shadow-inner">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-white font-semibold tracking-wide">SERVIDORES: CONECTADOS</span>
-            </div>
+            <button
+              onClick={() => setShowRoomModal(true)}
+              className="flex items-center gap-2 hover:text-cyan-300 transition cursor-pointer"
+              title="Clique para gerenciar a sala online"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-emerald-400 font-bold tracking-wide">SALA: {roomCode || 'BD-MAIN'}</span>
+            </button>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-300">{displayTeams.length} EQUIPES ATIVAS</span>
+            <span className="text-cyan-300 font-bold">{totalSlotsUsed} ALUNOS CONECTADOS</span>
             <span className="text-slate-600">•</span>
-            <span className="text-cyan-400 font-semibold">SYNC: 100% (GLOBAL)</span>
+            <span className="text-emerald-400 font-semibold">SYNC: 100% ONLINE</span>
           </div>
 
           {/* Direita: Controles Utilitários */}
           <div className="flex items-center gap-2">
+            
+            {/* Botão de Sala Online Interativa */}
+            <button
+              onClick={() => setShowRoomModal(true)}
+              className="h-9 px-3 rounded-lg border font-mono text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer bg-emerald-950/90 border-emerald-400/60 text-emerald-300 hover:bg-emerald-900 shadow-sm"
+              type="button"
+              title="Gerenciar Sala Online (Compartilhe o código com a turma)"
+            >
+              <Globe className="w-4 h-4 text-emerald-400" />
+              <span className="font-bold uppercase tracking-wider">{roomCode || 'BD-MAIN'}</span>
+            </button>
 
+            {/* Alternar Modo ADM */}
             <button
               onClick={() => {
                 if (isAdmin) {
@@ -204,6 +242,7 @@ export default function TeamLobbyScreen({
               <span className="uppercase font-bold">{isAdmin ? '👑 ADM ATIVO' : '🔒 MODO ADM'}</span>
             </button>
 
+            {/* Mudo SFX */}
             <button
               onClick={() => setIsMuted(!isMuted)}
               className="h-9 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-400 transition flex items-center gap-1.5 shadow-sm active:scale-95"
@@ -213,6 +252,7 @@ export default function TeamLobbyScreen({
               <span className="font-mono text-xs hidden md:inline font-bold">Audio: {isMuted ? 'MUTE' : 'ON'}</span>
             </button>
 
+            {/* Regras */}
             <button
               onClick={onOpenRules}
               className="h-9 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-400 transition flex items-center gap-1.5 shadow-sm active:scale-95"
@@ -255,26 +295,39 @@ export default function TeamLobbyScreen({
               <div className="flex flex-col gap-5 relative z-10 py-2">
                 <div className="flex flex-col gap-2">
                   <label className="font-mono text-xs text-slate-400 flex items-center justify-between">
-                    <span className="font-bold uppercase tracking-wider">NOME DO ESTUDANTE / ALIAS</span>
-                    <span className="text-cyan-400 font-bold">OBRIGATÓRIO</span>
+                    <span className="font-bold uppercase tracking-wider">SEU NOME / ALIAS</span>
+                    <span className="text-cyan-400 font-bold">DIGITE E CONFIRME</span>
                   </label>
-                  <div className="relative flex items-center">
-                    <User className="absolute left-3.5 text-cyan-400 w-5 h-5" />
-                    <input
-                      className="w-full bg-[#0a1224] text-white font-sans text-base pl-11 pr-4 py-3.5 rounded-xl border border-cyan-400/40 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition shadow-inner font-semibold tracking-wide"
-                      placeholder="Ex: Carlos Codd"
-                      type="text"
-                      value={nameInput}
-                      onChange={(e) => {
-                        setNameInput(e.target.value);
-                        if (setStudentName) setStudentName(e.target.value);
-                      }}
-                      onBlur={() => {
-                        if (joinTeamMember && nameInput.trim().length >= 2) {
-                          joinTeamMember({ teamId: activeTeamId, studentName: nameInput.trim() });
-                        }
-                      }}
-                    />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 flex items-center">
+                      <User className="absolute left-3.5 text-cyan-400 w-5 h-5" />
+                      <input
+                        ref={nameInputRef}
+                        className="w-full bg-[#0a1224] text-white font-sans text-base pl-11 pr-4 py-3 rounded-xl border border-cyan-400/40 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none transition shadow-inner font-semibold tracking-wide"
+                        placeholder="Ex: Carlos Codd"
+                        type="text"
+                        value={nameInput}
+                        onChange={(e) => {
+                          setNameInput(e.target.value);
+                          if (setStudentName) setStudentName(e.target.value);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleJoinTeam(activeTeamId);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleJoinTeam(activeTeamId)}
+                      className="px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-teal-300 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-display text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-glow-cyan active:scale-95 transition cursor-pointer shrink-0"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                      <span>CONFIRMAR</span>
+                    </button>
                   </div>
                 </div>
 
@@ -287,14 +340,22 @@ export default function TeamLobbyScreen({
                       </div>
                       <div className="flex flex-col">
                         <span className="font-display text-sm font-bold text-white tracking-wide">
-                          {nameInput || 'Estudante (Sem nome)'}
+                          {nameInput || 'Estudante (Digite seu nome)'}
                         </span>
-                        <span className="font-mono text-[11px] text-slate-400">ID: 2026-REL-8841</span>
+                        <span className="font-mono text-[11px] text-slate-400">
+                          {userCurrentTeam ? `Integrado à ${userCurrentTeam.name}` : 'Aguardando seleção de equipe'}
+                        </span>
                       </div>
                     </div>
-                    <span className="font-mono text-[10px] bg-emerald-400/15 text-emerald-400 border border-emerald-400/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" /> AUTORIZADO
-                    </span>
+                    {userCurrentTeam ? (
+                      <span className="font-mono text-[10px] bg-emerald-400/15 text-emerald-400 border border-emerald-400/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" /> CONECTADO
+                      </span>
+                    ) : (
+                      <span className="font-mono text-[10px] bg-amber-400/15 text-amber-400 border border-amber-400/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                        PENDENTE
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 font-mono text-[11px]">
@@ -303,8 +364,10 @@ export default function TeamLobbyScreen({
                       <span className="text-cyan-200 font-semibold truncate">{courseInput}</span>
                     </div>
                     <div className="flex flex-col gap-0.5 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 text-[10px] uppercase font-bold">Permissão ACID</span>
-                      <span className="text-emerald-400 font-semibold">Nível 3 (Full DML)</span>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold">Sua Equipe Atual</span>
+                      <span className="text-emerald-400 font-semibold truncate">
+                        {userCurrentTeam ? userCurrentTeam.name : 'Nenhuma (Selecione ao lado)'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -313,7 +376,7 @@ export default function TeamLobbyScreen({
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center gap-2.5">
                   <Info className="w-4 h-4 text-cyan-400 shrink-0" />
                   <span className="text-xs text-slate-300 leading-relaxed font-sans">
-                    Seu alias será exibido para todos os membros da equipe no mapa relacional do Overworld.
+                    Seu nome aparecerá em tempo real nos celulares e computadores de todos os colegas da turma.
                   </span>
                 </div>
               </div>
@@ -353,12 +416,20 @@ export default function TeamLobbyScreen({
                   const currentMembers = team.members || [];
                   const freeSlots = Math.max(0, maxSlots - currentMembers.length);
 
+                  // Verifica se este usuário específico já é membro desta equipe
+                  const isUserMemberOfThisTeam = currentCleanName && currentMembers.some((m) => {
+                    const mName = typeof m === 'string' ? m : m?.name;
+                    return mName?.toLowerCase() === currentCleanName.toLowerCase();
+                  });
+
                   return (
                     <div
                       key={team.id}
-                      onClick={() => handleSelectTeam(team.id)}
+                      onClick={() => handleJoinTeam(team.id)}
                       className={`team-card p-4 rounded-xl flex flex-col gap-3 transition cursor-pointer relative ${
-                        isSelected
+                        isUserMemberOfThisTeam
+                          ? 'bg-gradient-to-r from-[#0d2e28] via-[#0b1e1f] to-[#071318] border-2 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.3)]'
+                          : isSelected
                           ? 'bg-gradient-to-r from-[#0d2238] via-[#0b172a] to-[#07101f] border-2 border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.25)]'
                           : 'bg-slate-900/80 border border-slate-800 hover:border-slate-700'
                       }`}
@@ -380,11 +451,15 @@ export default function TeamLobbyScreen({
                           <span className="font-mono text-[10px] bg-slate-950 border border-slate-800 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">
                             {freeSlots} VAGAS LIVRES
                           </span>
-                          {isSelected && (
-                            <span className="font-mono text-[10px] bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                              SUA EQUIPE
+                          {isUserMemberOfThisTeam ? (
+                            <span className="font-mono text-[10px] bg-emerald-400 text-slate-950 font-bold px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 shadow-glow-emerald">
+                              <CheckCircle2 className="w-3 h-3 text-slate-950" /> VOCÊ ESTÁ AQUI
                             </span>
-                          )}
+                          ) : isSelected ? (
+                            <span className="font-mono text-[10px] bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                              SELECIONADA
+                            </span>
+                          ) : null}
                         </div>
                       </div>
 
@@ -399,13 +474,18 @@ export default function TeamLobbyScreen({
                           <div className="flex flex-wrap gap-1.5">
                             {currentMembers.map((mem, idx) => {
                               const nameStr = typeof mem === 'string' ? mem : mem.name || 'Aluno';
+                              const isMe = currentCleanName && nameStr.toLowerCase() === currentCleanName.toLowerCase();
                               return (
                                 <span
                                   key={idx}
-                                  className="inline-flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-950 border border-cyan-400/40 text-cyan-200 shadow-sm font-bold"
+                                  className={`inline-flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-lg border shadow-sm font-bold ${
+                                    isMe
+                                      ? 'bg-emerald-950 border-emerald-400 text-emerald-300 shadow-glow-emerald/30'
+                                      : 'bg-slate-950 border-cyan-400/40 text-cyan-200'
+                                  }`}
                                 >
-                                  <User className="w-3 h-3 text-cyan-400" />
-                                  <span>{nameStr}</span>
+                                  <User className={`w-3 h-3 ${isMe ? 'text-emerald-400' : 'text-cyan-400'}`} />
+                                  <span>{nameStr} {isMe && '(Você)'}</span>
                                   {isAdmin && (
                                     <button
                                       type="button"
@@ -436,16 +516,20 @@ export default function TeamLobbyScreen({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleSelectTeam(team.id);
+                              handleJoinTeam(team.id);
                             }}
                             className={`px-4 py-2 rounded-lg font-display text-xs uppercase font-bold tracking-wider shadow flex items-center gap-1.5 transition active:scale-95 ${
-                              isSelected ? team.btnSelected : team.btnUnselected
+                              isUserMemberOfThisTeam
+                                ? 'bg-emerald-500 text-slate-950 font-black shadow-glow-emerald cursor-default'
+                                : isSelected
+                                ? team.btnSelected
+                                : team.btnUnselected
                             }`}
                           >
-                            {isSelected ? (
+                            {isUserMemberOfThisTeam ? (
                               <>
                                 <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                                <span>EQUIPE SELECIONADA</span>
+                                <span>SUA EQUIPE (CONECTADO)</span>
                               </>
                             ) : (
                               <span>JUNTAR-SE À {team.name.split(' ')[1]?.toUpperCase() || 'EQUIPE'}</span>
@@ -473,15 +557,38 @@ export default function TeamLobbyScreen({
         {/* 3. BARRA DE AÇÃO INFERIOR & CALL TO ACTION WIDESCREEN */}
         <div className="flex flex-col gap-2 w-full mt-2">
           <button
-            onClick={handleConnect}
-            className="w-full py-4 px-6 bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 hover:brightness-110 active:scale-[0.99] text-slate-950 font-display text-base uppercase font-black tracking-wider rounded-xl shadow-[0_0_30px_rgba(0,240,255,0.4)] flex items-center justify-center gap-3 transition border border-cyan-200 cursor-pointer"
+            onClick={handleMainAction}
+            className={`w-full py-4 px-6 font-display text-base uppercase font-black tracking-wider rounded-xl shadow-2xl flex items-center justify-center gap-3 transition border active:scale-[0.99] cursor-pointer ${
+              isAdmin
+                ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 text-slate-950 border-emerald-300 shadow-[0_0_30px_rgba(52,211,153,0.4)] hover:brightness-110'
+                : userCurrentTeam
+                ? 'bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 text-emerald-300 border-emerald-400/50 shadow-inner'
+                : 'bg-gradient-to-r from-cyan-400 via-teal-300 to-cyan-400 text-slate-950 border-cyan-200 shadow-[0_0_30px_rgba(0,240,255,0.4)] hover:brightness-110'
+            }`}
             type="button"
           >
-            <Satellite className="w-6 h-6 text-slate-950" />
-            <span>CONECTAR AO OVERWORLD & ENTRAR NA ARENA</span>
-            <span className="font-mono text-xs bg-slate-950/20 border border-slate-950/30 px-2.5 py-1 rounded text-slate-950 ml-1 font-bold">
-              [PRESS ENTER]
-            </span>
+            {isAdmin ? (
+              <>
+                <Satellite className="w-6 h-6 text-slate-950" />
+                <span>INICIAR PARTIDA & ABRIR ARENA PARA TODOS OS ALUNOS</span>
+                <span className="font-mono text-xs bg-slate-950/20 border border-slate-950/30 px-2.5 py-1 rounded text-slate-950 ml-1 font-bold">
+                  [MODO PROFESSOR]
+                </span>
+              </>
+            ) : userCurrentTeam ? (
+              <>
+                <CheckCircle2 className="w-6 h-6 text-emerald-400 animate-pulse" />
+                <span>VOCÊ ESTÁ NA {userCurrentTeam.name.toUpperCase()} • AGUARDANDO O PROFESSOR INICIAR A ARENA...</span>
+              </>
+            ) : (
+              <>
+                <Users className="w-6 h-6 text-slate-950" />
+                <span>CONFIRMAR NOME E ENTRAR NA EQUIPE</span>
+                <span className="font-mono text-xs bg-slate-950/20 border border-slate-950/30 px-2.5 py-1 rounded text-slate-950 ml-1 font-bold">
+                  [PRESS ENTER]
+                </span>
+              </>
+            )}
           </button>
 
           {/* Feedback de Conexão */}
@@ -497,16 +604,16 @@ export default function TeamLobbyScreen({
       <footer className="w-full border-t border-slate-800 bg-[#060e20] px-4 lg:px-8 py-3 text-slate-400 font-mono text-xs">
         <div className="max-w-[1920px] mx-auto flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-white font-medium">TRANSAÇÃO SEGURA ACID</span>
+            <span className="text-white font-medium">SALA ONLINE: {roomCode || 'BD-MAIN'}</span>
             <span className="text-slate-600">•</span>
             <span>BD QUEST REL-OS v2.4</span>
           </div>
           <div className="flex items-center gap-3">
-            <span>PROTOCOLO DATE-1990</span>
+            <span>MULTIPLAYER STREAM v8</span>
             <span className="text-slate-600">•</span>
             <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              LATÊNCIA 24ms
+              LATÊNCIA &lt; 50ms
             </span>
           </div>
         </div>
@@ -522,6 +629,19 @@ export default function TeamLobbyScreen({
           checkAdminPassword={checkAdminPassword}
           logoutAdmin={logoutAdmin}
           onClose={() => setShowAuthModal(false)}
+        />
+      )}
+
+      {/* Modal de Sala Online Interativa */}
+      {showRoomModal && (
+        <OnlineRoomModal
+          isOpen={showRoomModal}
+          onClose={() => setShowRoomModal(false)}
+          roomCode={roomCode || 'BD-MAIN'}
+          isOnlineRoom={isOnlineRoom}
+          createOnlineRoom={createOnlineRoom}
+          joinOnlineRoom={joinOnlineRoom}
+          isAdmin={isAdmin}
         />
       )}
     </div>

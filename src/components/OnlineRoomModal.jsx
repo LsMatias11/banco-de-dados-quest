@@ -12,13 +12,14 @@ export default function OnlineRoomModal({
 }) {
   const [inputCode, setInputCode] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [feedback, setFeedback] = useState('');
 
   if (!isOpen) return null;
 
   const handleCreateNewRoom = () => {
     const newCode = createOnlineRoom();
-    setFeedback(`🚀 Sala ${newCode} criada com sucesso! Compartilhe o código com os alunos.`);
+    setFeedback(`🚀 Sala ${newCode} criada com sucesso! Compartilhe o código ou link com os alunos.`);
   };
 
   const handleJoinRoom = (e) => {
@@ -44,6 +45,12 @@ export default function OnlineRoomModal({
     navigator.clipboard.writeText(roomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyLinkToClipboard = () => {
+    navigator.clipboard.writeText(roomLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   return (
@@ -79,7 +86,7 @@ export default function OnlineRoomModal({
 
         {/* Active Status Badge */}
         {isOnlineRoom && (
-          <div className="mb-5 p-4 rounded-2xl bg-slate-950 border border-emerald-400/50 flex items-center justify-between gap-3 shadow-inner">
+          <div className="mb-5 p-4 rounded-2xl bg-slate-950 border border-emerald-400/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
             <div className="flex items-center gap-3">
               <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div>
               <div>
@@ -90,13 +97,25 @@ export default function OnlineRoomModal({
               </div>
             </div>
 
-            <button
-              onClick={copyToClipboard}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 border border-emerald-400/40 hover:bg-emerald-950 text-emerald-300 text-xs font-mono font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-            >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-              <span>{copied ? 'COPIADO!' : 'COPIAR CÓDIGO'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copyToClipboard}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-emerald-400/40 hover:bg-emerald-950 text-emerald-300 text-xs font-mono font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                title="Copiar apenas o código da sala"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'COPIADO!' : 'CÓDIGO'}</span>
+              </button>
+
+              <button
+                onClick={copyLinkToClipboard}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-cyan-400/40 hover:bg-cyan-950 text-cyan-300 text-xs font-mono font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                title="Copiar link completo com a sala para enviar aos alunos"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-cyan-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedLink ? 'LINK COPIADO!' : 'LINK'}</span>
+              </button>
+            </div>
           </div>
         )}
 
