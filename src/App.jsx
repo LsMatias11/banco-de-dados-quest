@@ -18,7 +18,6 @@ import DemoBar from './components/DemoBar';
 
 export default function App() {
   const gameState = useGameState();
-  const [viewMode, setViewMode] = useState('LOBBY'); // 'LOBBY' or 'GAME'
   const [activeMobileTab, setActiveMobileTab] = useState('quiz');
   const [showDemoBar, setShowDemoBar] = useState(false);
   const [studentName, setStudentName] = useState('');
@@ -64,6 +63,9 @@ export default function App() {
     nextTurn,
     useSabotageCard,
     resetGame,
+    viewMode,
+    setViewMode,
+    joinTeamMember,
     roomCode,
     isOnlineRoom,
     createOnlineRoom,
@@ -87,7 +89,10 @@ export default function App() {
         setActiveTeamId={setActiveTeamId}
         studentName={studentName}
         setStudentName={setStudentName}
-        onEnterArena={() => setViewMode('GAME')}
+        onEnterArena={() => {
+          setViewMode('GAME');
+          startGame();
+        }}
         isMuted={isMuted}
         setIsMuted={setIsMuted}
         onOpenRules={() => setShowExplanationModal(true)}
@@ -101,6 +106,8 @@ export default function App() {
         isOnlineRoom={isOnlineRoom}
         createOnlineRoom={createOnlineRoom}
         joinOnlineRoom={joinOnlineRoom}
+        teams={teams}
+        joinTeamMember={joinTeamMember}
       />
     );
   }

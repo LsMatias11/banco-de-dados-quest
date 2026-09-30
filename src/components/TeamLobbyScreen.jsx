@@ -68,7 +68,9 @@ export default function TeamLobbyScreen({
   roomCode,
   isOnlineRoom,
   createOnlineRoom,
-  joinOnlineRoom
+  joinOnlineRoom,
+  teams,
+  joinTeamMember
 }) {
   const [nameInput, setNameInput] = useState(studentName || '');
   const [courseInput, setCourseInput] = useState('Ciência da Computação');
@@ -76,7 +78,27 @@ export default function TeamLobbyScreen({
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
 
-  const selectedTeam = TEAMS_DATA.find((t) => t.id === activeTeamId) || TEAMS_DATA[0];
+  const displayTeams = TEAMS_DATA.map((staticTeam) => {
+    const dynamicTeam = (teams || []).find((t) => t.id === staticTeam.id) || staticTeam;
+    return {
+      ...staticTeam,
+      ...dynamicTeam,
+      members: dynamicTeam.members || []
+    };
+  });
+
+  const totalSlotsUsed = displayTeams.reduce((sum, t) => sum + (t.members?.length || 0), 0);
+  const totalSlotsAvailable = 32 - totalSlotsUsed;
+
+  const handleSelectTeam = (teamId) => {
+    setActiveTeamId(teamId);
+    if (setStudentName && nameInput.trim()) {
+      setStudentName(nameInput.trim());
+    }
+    if (joinTeamMember && nameInput.trim()) {
+      joinTeamMember({ teamId, studentName: nameInput.trim() });
+    }
+  };
 
   const handleConnect = () => {
     if (!isAdmin) {
@@ -86,6 +108,9 @@ export default function TeamLobbyScreen({
     }
 
     if (setStudentName) setStudentName(nameInput.trim() || 'Estudante Sem Nome');
+    if (joinTeamMember && nameInput.trim()) {
+      joinTeamMember({ teamId: activeTeamId, studentName: nameInput.trim() });
+    }
     setFeedbackMsg(`TRANSAÇÃO ACID INICIADA: Autenticando com o servidor de instância relacional de ${nameInput.trim() || 'Estudante'}...`);
     
     setTimeout(() => {
@@ -97,7 +122,7 @@ export default function TeamLobbyScreen({
   };
 
   const getInitials = (str) => {
-    if (!str) return 'LS';
+    if (!str) return 'AL';
     const parts = str.trim().split(' ');
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -134,10 +159,10 @@ export default function TeamLobbyScreen({
           <div className="hidden xl:flex items-center gap-3 bg-slate-950/80 border border-slate-800 px-4 py-1.5 rounded-full font-mono text-xs text-slate-300 shadow-inner">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-white font-semibold tracking-wide">SALA: 2026-BD01 [ONLINE]</span>
+              <span className="text-white font-semibold tracking-wide">SALA ONLINE: {roomCode || 'BD-MAIN'}</span>
             </div>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-300">4 EQUIPES CONECTADAS</span>
+            <span className="text-slate-300">{displayTeams.length} EQUIPES CONECTADAS</span>
             <span className="text-slate-600">•</span>
             <span className="text-cyan-400 font-semibold">SYNC: 100%</span>
             <span className="text-slate-600">•</span>
@@ -251,7 +276,13 @@ export default function TeamLobbyScreen({
                       placeholder="Ex: Carlos Codd"
                       type="text"
                       value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
+                      onChange={(e) => {
+                        setNameInput(e.target.value);
+                        if (setStudentName) setStudentName(e.target.value);
+                        if (joinTeamMember && e.target.value.trim()) {
+                          joinTeamMember({ teamId: activeTeamId, studentName: e.target.value });
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -318,21 +349,23 @@ export default function TeamLobbyScreen({
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[11px] text-slate-400">SLOTS DISPONÍVEIS:</span>
                   <span className="font-mono text-xs bg-slate-900 border border-slate-700 text-emerald-400 px-2 py-0.5 rounded font-bold">
-                    21/32
+                    {totalSlotsAvailable}/32
                   </span>
                 </div>
               </div>
 
               {/* LISTA DE 4 CARDS DE EQUIPES (Alfa, Beta, Gama, Delta) */}
               <div className="flex flex-col gap-3.5 relative z-10">
-                {TEAMS_DATA.map((team) => {
+                {displayTeams.map((team) => {
                   const isSelected = activeTeamId === team.id;
-                  const freeSlots = team.maxSlots - team.members.length;
+                  const maxSlots = team.maxSlots || 8;
+                  const currentMembers = team.members || [];
+                  const freeSlots = Math.max(0, maxSlots - currentMembers.length);
 
                   return (
                     <div
                       key={team.id}
-                      onClick={() => setActiveTeamId(team.id)}
+                      onClick={() => handleSelectTeam(team.id)}
                       className={`team-card p-4 rounded-xl flex flex-col gap-3 transition cursor-pointer relative ${
                         isSelected
                           ? 'bg-gradient-to-r from-[#0d2238] via-[#0b172a] to-[#07101f] border-2 border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.25)]'
@@ -353,7 +386,7 @@ export default function TeamLobbyScreen({
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[10px] bg-slate-950 border border-slate-800 text-slate-300 px-2 py-0.5 rounded uppercase tracking-wider">
+                          <span className="font-mono text-[10px] bg-slate-950 border border-slate-800 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">
                             {freeSlots} VAGAS LIVRES
                           </span>
                           {isSelected && (
@@ -364,23 +397,31 @@ export default function TeamLobbyScreen({
                         </div>
                       </div>
 
-                      <p className="text-xs text-slate-300 italic font-sans">{team.slogan}</p>
-
                       <div className="flex items-center justify-between flex-wrap gap-3 pt-1 border-t border-slate-800">
                         {/* Avatares dos Membros */}
                         <div className="flex items-center gap-2.5">
                           <div className="flex -space-x-2 overflow-hidden">
-                            {team.members.map((mem, idx) => (
-                              <div
-                                key={idx}
-                                className="w-7 h-7 rounded-full bg-slate-950 border border-cyan-400/40 flex items-center justify-center font-mono text-cyan-300 text-[10px] font-bold shadow"
-                              >
-                                {mem}
-                              </div>
-                            ))}
+                            {currentMembers.length > 0 ? (
+                              currentMembers.map((mem, idx) => {
+                                const nameStr = typeof mem === 'string' ? mem : mem.name || 'Aluno';
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="w-7 h-7 rounded-full bg-slate-950 border border-cyan-400/40 flex items-center justify-center font-mono text-cyan-300 text-[10px] font-bold shadow"
+                                    title={nameStr}
+                                  >
+                                    {getInitials(nameStr)}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <span className="font-mono text-[11px] text-slate-500 italic">
+                                NENHUM JOGADOR NA EQUIPE
+                              </span>
+                            )}
                           </div>
-                          <span className="font-mono text-xs text-slate-300">
-                            {team.members.length}/{team.maxSlots} Cadastrados
+                          <span className="font-mono text-xs text-slate-300 font-bold">
+                            {currentMembers.length}/{maxSlots} Cadastrados
                           </span>
                         </div>
 
@@ -389,7 +430,7 @@ export default function TeamLobbyScreen({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setActiveTeamId(team.id);
+                            handleSelectTeam(team.id);
                           }}
                           className={`px-4 py-2 rounded-lg font-display text-xs uppercase font-bold tracking-wider shadow flex items-center gap-1.5 transition active:scale-95 ${
                             isSelected ? team.btnSelected : team.btnUnselected

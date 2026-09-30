@@ -72,9 +72,10 @@ export function useGameState() {
   const [activeTeamId, setActiveTeamId] = useState(savedState?.activeTeamId || 'alfa');
   const [turnIndex, setTurnIndex] = useState(savedState?.turnIndex || 1);
 
-  // Sala Online State
-  const [roomCode, setRoomCode] = useState(savedState?.roomCode || 'BD-2026');
-  const [isOnlineRoom, setIsOnlineRoom] = useState(savedState?.isOnlineRoom || false);
+  // Sala Online State (Padronizada para BD-MAIN automática)
+  const [roomCode, setRoomCode] = useState(savedState?.roomCode || 'BD-MAIN');
+  const [isOnlineRoom, setIsOnlineRoom] = useState(savedState?.isOnlineRoom !== undefined ? savedState.isOnlineRoom : true);
+  const [viewMode, setViewMode] = useState(savedState?.viewMode || 'LOBBY'); // 'LOBBY' or 'GAME'
 
   // Controle do ADM / Administrador para Partida
   const [isGameStarted, setIsGameStarted] = useState(savedState?.isGameStarted || false);
@@ -159,6 +160,7 @@ export function useGameState() {
     const unsubscribe = subscribeToRoom(roomCode, (remoteState) => {
       if (!remoteState) return;
 
+      if (remoteState.viewMode) setViewMode(remoteState.viewMode);
       if (remoteState.teams) setTeams(remoteState.teams);
       if (remoteState.activeTeamId) setActiveTeamId(remoteState.activeTeamId);
       if (remoteState.turnIndex !== undefined) setTurnIndex(remoteState.turnIndex);
@@ -178,6 +180,7 @@ export function useGameState() {
   useEffect(() => {
     if (isOnlineRoom && roomCode) {
       publishRoomState(roomCode, {
+        viewMode,
         teams,
         activeTeamId,
         turnIndex,
@@ -190,7 +193,32 @@ export function useGameState() {
         winner
       });
     }
-  }, [teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, isOnlineRoom, roomCode]);
+  }, [viewMode, teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, isOnlineRoom, roomCode]);
+
+  // Função para cadastrar / associar membro a uma equipe
+  const joinTeamMember = useCallback(({ teamId, studentName }) => {
+    if (!studentName || !studentName.trim()) return;
+    const cleanName = studentName.trim();
+
+    setTeams((prevTeams) =>
+      prevTeams.map((team) => {
+        const currentMembers = team.members || [];
+        const filtered = currentMembers.filter(
+          (m) => (typeof m === 'string' ? m : m.name) !== cleanName
+        );
+
+        if (team.id === teamId) {
+          const alreadyIn = currentMembers.some(
+            (m) => (typeof m === 'string' ? m : m.name) === cleanName
+          );
+          if (!alreadyIn && filtered.length < 8) {
+            return { ...team, members: [...filtered, cleanName] };
+          }
+        }
+        return { ...team, members: filtered };
+      })
+    );
+  }, []);
 
   const createOnlineRoom = () => {
     const newCode = generateRoomCode();
@@ -587,8 +615,9 @@ export function useGameState() {
     stopGame,
     handleAnswer,
     nextTurn,
-    useSabotageCard,
-    resetGame,
+    viewMode,
+    setViewMode,
+    joinTeamMember,
     roomCode,
     setRoomCode,
     isOnlineRoom,
