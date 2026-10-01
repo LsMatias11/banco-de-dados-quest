@@ -108,57 +108,57 @@ export default function SabotagePanel({
               return (
                 <div
                   key={card.id}
-                  className={`p-3 rounded-2xl border-2 transition group ${
+                  className={`p-3 rounded-2xl border-2 transition group flex flex-col justify-between gap-2.5 ${
                     canAfford && canSabotage
                       ? `${theme.border}`
-                      : 'bg-arcade-darkest/40 border-white/5 opacity-50 cursor-not-allowed'
+                      : 'bg-arcade-darkest/40 border-white/5 opacity-60 cursor-not-allowed'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2.5">
-                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm mt-0.5 group-hover:scale-110 transition ${
-                        canAfford && canSabotage ? theme.iconBg : 'bg-slate-900 text-slate-600'
-                      }`}>
-                        <CardIcon className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                          <h4 className="text-xs font-black text-white font-display tracking-wide uppercase">
-                            {card.name}
-                          </h4>
-                          <span className={`text-[8px] font-mono font-bold px-1.5 py-0.2 rounded tracking-wider ${theme.badge}`}>
-                            {theme.tag}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-200 leading-snug font-medium">
-                          {card.desc}
-                        </p>
-                      </div>
+                  {/* Top: Ícone, Nome da Carta e Tag */}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition ${
+                      canAfford && canSabotage ? theme.iconBg : 'bg-slate-900 text-slate-600'
+                    }`}>
+                      <CardIcon className="w-4 h-4" />
                     </div>
-
-                    <button
-                      disabled={!canAfford || !canSabotage}
-                      onClick={() => canSabotage && canAfford && onUseSabotage(card.id, studentName)}
-                      className={`px-3 py-1.5 rounded-xl font-display font-black text-[10px] uppercase tracking-wider active:scale-95 transition shrink-0 ${
-                        canAfford && canSabotage
-                          ? theme.btn
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700 opacity-60'
-                      }`}
-                      title={
-                        !isMyTeamTurn
-                          ? `Apenas a equipe que está no turno (${activeTeam?.name}) pode lançar sabotagens!`
-                          : !canAfford
-                          ? `Precisa de ${cost} PTS`
-                          : `Comprar por ${cost} PTS`
-                      }
-                    >
-                      {!isMyTeamTurn
-                        ? 'TURNO ADVERSÁRIO'
-                        : canAfford
-                        ? (card.isHelp ? `USAR AJUDA (-${cost} PTS)` : `LANÇAR (-${cost} PTS)`)
-                        : `${cost} PTS`}
-                    </button>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-black text-white font-display tracking-wide uppercase truncate">
+                        {card.name}
+                      </h4>
+                      <span className={`inline-block text-[8px] font-mono font-bold px-1.5 py-0.5 rounded tracking-wider ${theme.badge}`}>
+                        {theme.tag}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Middle: Descrição com 100% de largura (sem textão espremido) */}
+                  <p className="text-[11px] text-slate-300 leading-normal font-medium">
+                    {card.desc}
+                  </p>
+
+                  {/* Bottom: Botão de Ação Alinhado e com largura total (sem tampar título) */}
+                  <button
+                    disabled={!canAfford || !canSabotage}
+                    onClick={() => canSabotage && canAfford && onUseSabotage(card.id, studentName)}
+                    className={`w-full py-2 px-3 rounded-xl font-display font-black text-[10px] uppercase tracking-wider active:scale-[0.98] transition flex items-center justify-center gap-1.5 shadow-md ${
+                      canAfford && canSabotage
+                        ? theme.btn
+                        : 'bg-slate-800/80 text-slate-500 cursor-not-allowed border border-slate-700/60'
+                    }`}
+                    title={
+                      !isMyTeamTurn
+                        ? `Apenas a equipe que está no turno (${activeTeam?.name}) pode lançar cartas!`
+                        : !canAfford
+                        ? `Precisa de ${cost} PTS`
+                        : `Comprar por ${cost} PTS`
+                    }
+                  >
+                    {!isMyTeamTurn
+                      ? 'TURNO ADVERSÁRIO'
+                      : canAfford
+                      ? (card.isHelp ? `USAR AJUDA (-${cost} PTS)` : `LANÇAR (-${cost} PTS)`)
+                      : `CRÉDITOS INSUFICIENTES (${cost} PTS)`}
+                  </button>
                 </div>
               );
             })}

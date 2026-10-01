@@ -272,7 +272,7 @@ export const SABOTAGE_CARDS = [
     name: 'Tempo Curto',
     subtitle: 'TIMEOUT',
     cost: 600,
-    desc: 'Reduz o tempo de resposta do rival em 15s (de 30s para apenas 15s).',
+    desc: 'Reduz o tempo do rival de 30s para 15s.',
     icon: 'Clock',
     color: 'amber'
   },
@@ -281,7 +281,7 @@ export const SABOTAGE_CARDS = [
     name: 'Depuração Relacional',
     subtitle: 'AJUDA 50/50',
     cost: 800,
-    desc: 'Elimina 1 alternativa incorreta da pergunta atual para a sua equipe.',
+    desc: 'Elimina 1 opção incorreta para a sua equipe.',
     icon: 'Sparkles',
     color: 'pink',
     isHelp: true
@@ -291,7 +291,7 @@ export const SABOTAGE_CARDS = [
     name: 'Bloqueio Paralelo',
     subtitle: 'DEADLOCK',
     cost: 1000,
-    desc: 'Congela a transação rival (Deadlock), forçando a pular o turno.',
+    desc: 'Cria um Deadlock no rival, pulando a vez dele.',
     icon: 'Lock',
     color: 'cyan'
   }
