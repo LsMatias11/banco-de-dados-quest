@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Skull, Award, FastForward, Trophy, Edit3, Check } from 'lucide-react';
+import { Sparkles, Skull, Award, FastForward, Trophy, Edit3, Check, RotateCcw, Home } from 'lucide-react';
 
 export default function DemoBar({ onDemoAction, studentData, setStudentData }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -61,13 +61,41 @@ export default function DemoBar({ onDemoAction, studentData, setStudentData }) {
             Avançar +5 Casas
           </button>
 
+          {/* Resetar Partida / Começar de Novo */}
+          <button
+            onClick={() => {
+              if (window.confirm('Deseja reiniciar a partida do zero na Arena? As posições e pontos serão resetados para todas as equipes.')) {
+                onDemoAction('RESTART_MATCH');
+              }
+            }}
+            className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 flex items-center gap-1 transition-all font-bold"
+            title="Reinicia a partida do zero para todas as equipes mantendo-as na arena"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+            Resetar Partida
+          </button>
+
+          {/* Voltar Todos pro Lobby */}
+          <button
+            onClick={() => {
+              if (window.confirm('Deseja encerrar a partida e levar TODOS os alunos de volta para a tela inicial de equipes?')) {
+                onDemoAction('RETURN_TO_LOBBY');
+              }
+            }}
+            className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 flex items-center gap-1 transition-all font-bold"
+            title="Leva todos os alunos conectados de volta para a tela inicial (Lobby)"
+          >
+            <Home className="w-3.5 h-3.5 text-emerald-400" />
+            Voltar Todos pro Lobby
+          </button>
+
           {/* Simular Vitória */}
           <button
             onClick={() => onDemoAction('VICTORY_DEMO')}
-            className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex items-center gap-1 transition-all"
+            className="px-2.5 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 flex items-center gap-1 transition-all"
             title="Demonstra o modal festivo de vitória final"
           >
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <Trophy className="w-3.5 h-3.5 text-yellow-400" />
             Simular Vitória
           </button>
 

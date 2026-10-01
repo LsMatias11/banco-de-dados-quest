@@ -15,6 +15,7 @@ import VictoryModal from './components/VictoryModal';
 import ExplanationModal from './components/ExplanationModal';
 import LeaderboardPanel from './components/LeaderboardPanel';
 import DemoBar from './components/DemoBar';
+import SabotageNotification from './components/SabotageNotification';
 
 export default function App() {
   const gameState = useGameState();
@@ -75,6 +76,9 @@ export default function App() {
     nextTurn,
     useSabotageCard,
     resetGame,
+    restartMatch,
+    sabotageAlert,
+    closeSabotageAlert,
     viewMode,
     setViewMode,
     joinTeamMember,
@@ -327,6 +331,16 @@ export default function App() {
         setActiveTab={setActiveMobileTab}
         errorCount={activeTeam?.errorCount || 0}
       />
+
+      {/* Notificação Visual Sincronizada de Sabotagem */}
+      {sabotageAlert && (
+        <SabotageNotification
+          alert={sabotageAlert}
+          studentName={studentName}
+          teams={teams}
+          onClose={closeSabotageAlert}
+        />
+      )}
 
       {/* SYSTEM MODALS */}
       <RollbackModal

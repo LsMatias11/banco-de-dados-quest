@@ -134,7 +134,9 @@ export function useGameState() {
   const [isAnswered, setIsAnswered] = useState(false);
   const [answerResult, setAnswerResult] = useState(null);
 
-  // Modais
+  // Modais e Alertas
+  const [sabotageAlert, setSabotageAlert] = useState(null);
+  const closeSabotageAlert = () => setSabotageAlert(null);
   const [rollbackAlert, setRollbackAlert] = useState(null);
   const [winner, setWinner] = useState(savedState?.winner || null);
   const [showExplanationModal, setShowExplanationModal] = useState(false);
@@ -288,7 +290,7 @@ const sanitizeMembers = (membersList) => {
         return;
       }
 
-      // 6. AÇÃO: Resetar Jogo Completo
+      // 6. AÇÃO: Resetar Jogo Completo e Voltar pro Lobby
       if (msg.type === 'RESET_GAME') {
         setTeams(INITIAL_TEAMS);
         setActiveTeamId('alfa');
@@ -308,7 +310,83 @@ const sanitizeMembers = (membersList) => {
         return;
       }
 
-      // 7. SINCRONIZAÇÃO COMPLETA DE ESTADO
+      // 7. AÇÃO: Reiniciar Partida do Zero na Arena (RESTART_MATCH)
+      if (msg.type === 'RESTART_MATCH') {
+        setTeams((prev) =>
+          prev.map((t) => ({
+            ...t,
+            position: 1,
+            errorCount: 0,
+            credits: 1000,
+            bingoGrid: createEmptyBingo()
+          }))
+        );
+        setActiveTeamId('alfa');
+        setTurnIndex(1);
+        setCurrentQuestionIdx(0);
+        setSelectedOption(null);
+        setIsAnswered(false);
+        setAnswerResult(null);
+        setWinner(null);
+        setRollbackAlert(null);
+        setIsGameStarted(true);
+        setIsGamePaused(false);
+        setViewMode('GAME');
+        if (msg.timerExpiresAt) {
+          setTimerExpiresAt(msg.timerExpiresAt);
+          setTimer(Math.max(0, Math.ceil((msg.timerExpiresAt - Date.now()) / 1000)));
+          setTimerActive(true);
+        } else {
+          setTimer(30);
+          setTimerActive(true);
+        }
+        return;
+      }
+
+      // 8. AÇÃO: Sabotagem Acionada em Tempo Real
+      if (msg.type === 'SABOTAGE_TRIGGERED') {
+        setSabotageAlert({
+          cardId: msg.cardId,
+          cardName: msg.cardName,
+          sourceTeamId: msg.sourceTeamId,
+          sourceTeamName: msg.sourceTeamName,
+          targetTeamId: msg.targetTeamId,
+          targetTeamName: msg.targetTeamName,
+          timestamp: Date.now()
+        });
+        if (msg.timerExpiresAt) {
+          setTimerExpiresAt(msg.timerExpiresAt);
+          setTimer(Math.max(0, Math.ceil((msg.timerExpiresAt - Date.now()) / 1000)));
+        } else if (msg.timer !== undefined) {
+          setTimer(msg.timer);
+        }
+        return;
+      }
+
+      // 9. AÇÃO: Requisição de Estado para Novos Clientes (ex: Edge conectando)
+      if (msg.type === 'REQUEST_SYNC') {
+        if (isAdmin || isGameStarted) {
+          publishRoomState(roomCode, {
+            type: 'SYNC_STATE',
+            viewMode,
+            teams: teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+            activeTeamId,
+            turnIndex,
+            isGameStarted,
+            isGamePaused,
+            currentQuestionIdx,
+            selectedOption,
+            isAnswered,
+            answerResult,
+            winner,
+            timer,
+            timerExpiresAt
+          });
+        }
+        return;
+      }
+
+      // 10. SINCRONIZAÇÃO COMPLETA DE ESTADO
       const remoteState = msg.state || msg;
       if (remoteState.viewMode) setViewMode(remoteState.viewMode);
       if (remoteState.teams && Array.isArray(remoteState.teams)) {
@@ -337,8 +415,16 @@ const sanitizeMembers = (membersList) => {
       }
     });
 
-    return () => unsubscribe();
-  }, [roomCode, isOnlineRoom]);
+    // Solicita sincronização imediata dos peers já online (crucial para o Edge sincronizar no primeiro segundo)
+    const syncTimeout = setTimeout(() => {
+      publishRoomState(roomCode, { type: 'REQUEST_SYNC' });
+    }, 350);
+
+    return () => {
+      clearTimeout(syncTimeout);
+      unsubscribe();
+    };
+  }, [roomCode, isOnlineRoom, isAdmin, isGameStarted, isGamePaused, viewMode, teams, activeTeamId, turnIndex, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, timer, timerExpiresAt]);
 
   // Função para cadastrar / associar membro a uma equipe (substitui nome antigo se editado)
   const joinTeamMember = useCallback(({ teamId, studentName, previousName }) => {
@@ -809,7 +895,7 @@ const sanitizeMembers = (membersList) => {
     }
   };
 
-  // Ativar Carta de Sabotagem (Dedução de Créditos PTS)
+  // Ativar Carta de Sabotagem (Dedução de Créditos PTS e Notificação Visual Sincronizada)
   const useSabotageCard = (cardId) => {
     if (isAnswered) return;
 
@@ -817,11 +903,19 @@ const sanitizeMembers = (membersList) => {
     const cost = card ? card.cost : 400;
 
     if (activeTeam.credits < cost) {
-      alert(`CRÉDITOS INSUFICIENTES! A ${activeTeam.name} tem ${activeTeam.credits} PTS, mas o ataque ${card?.name || cardId} custa ${cost} PTS.\n\nResponda às questões corretamente (+150 PTS) para acumular mais créditos!`);
+      setSabotageAlert({
+        cardId: 'ERROR',
+        cardName: 'Créditos Insuficientes',
+        sourceTeamId: activeTeam.id,
+        sourceTeamName: activeTeam.name,
+        targetTeamId: null,
+        targetTeamName: null,
+        timestamp: Date.now()
+      });
       return;
     }
 
-    // Deduzir Créditos PTS e Lançar Sabotagem
+    // Deduzir Créditos PTS da equipe atacante
     setTeams((prev) =>
       prev.map((t) => {
         if (t.id !== activeTeamId) return t;
@@ -832,26 +926,47 @@ const sanitizeMembers = (membersList) => {
       })
     );
 
+    // Identificar a equipe adversária alvo (próxima na rotação)
+    const teamList = teams && teams.length > 0 ? teams : INITIAL_TEAMS;
+    const currentIdx = teamList.findIndex((t) => t.id === activeTeamId);
+    const targetIdx = currentIdx >= 0 ? (currentIdx + 1) % teamList.length : 0;
+    const targetTeam = teamList[targetIdx] || teamList[0];
+
+    let newExpires = null;
+    let newRemaining = null;
+
     if (cardId === 'TIMEOUT') {
       setActiveSabotages((prev) => ({ ...prev, timeoutActive: true }));
-      alert(`TEMPO CURTO LANÇADO (-${cost} PTS)! O próximo turno rival terá tempo reduzido de 30s para apenas 15s.`);
     } else if (cardId === 'PARALLEL_LOCK') {
-      alert(`DEADLOCK RELACIONAL LANÇADO (-${cost} PTS)! O próximo turno rival foi congelado.`);
+      // Bloqueio relacional
     } else if (cardId === 'RELATIONAL_OVERLOAD') {
       const now = Date.now();
       const currentRemaining = timerExpiresAt ? Math.max(0, Math.ceil((timerExpiresAt - now) / 1000)) : timer;
-      const newRemaining = Math.max(5, currentRemaining - 15);
-      const newExpires = now + newRemaining * 1000;
+      newRemaining = Math.max(5, currentRemaining - 15);
+      newExpires = now + newRemaining * 1000;
       setTimer(newRemaining);
       setTimerExpiresAt(newExpires);
-      if (isOnlineRoom && roomCode) {
-        publishRoomState(roomCode, {
-          type: 'SYNC_STATE',
-          timer: newRemaining,
-          timerExpiresAt: newExpires
-        });
-      }
-      alert(`SOBRECARGA RELACIONAL LANÇADA (-${cost} PTS)! 15s foram drenados do cronômetro rival.`);
+    }
+
+    const alertData = {
+      cardId,
+      cardName: card?.name || cardId,
+      sourceTeamId: activeTeam.id,
+      sourceTeamName: activeTeam.name,
+      targetTeamId: targetTeam.id,
+      targetTeamName: targetTeam.name,
+      timestamp: Date.now()
+    };
+
+    setSabotageAlert(alertData);
+
+    if (isOnlineRoom && roomCode) {
+      publishRoomState(roomCode, {
+        type: 'SABOTAGE_TRIGGERED',
+        ...alertData,
+        timer: newRemaining,
+        timerExpiresAt: newExpires
+      });
     }
   };
 
@@ -884,7 +999,50 @@ const sanitizeMembers = (membersList) => {
     }
   };
 
-  // Resetar Jogo
+  // Reiniciar a Partida mantendo os times cadastrados na Arena (Começar de Novo)
+  const restartMatch = () => {
+    const expiresAt = Date.now() + 30 * 1000;
+    setTeams((prev) =>
+      prev.map((t) => ({
+        ...t,
+        position: 1,
+        errorCount: 0,
+        credits: 1000,
+        bingoGrid: createEmptyBingo()
+      }))
+    );
+    setActiveTeamId('alfa');
+    setTurnIndex(1);
+    setCurrentQuestionIdx(0);
+    setTimer(30);
+    setTimerExpiresAt(expiresAt);
+    setTimerActive(true);
+    setPausedRemaining(null);
+    setSelectedOption(null);
+    setIsAnswered(false);
+    setAnswerResult(null);
+    setWinner(null);
+    setRollbackAlert(null);
+    setIsGameStarted(true);
+    setIsGamePaused(false);
+    setViewMode('GAME');
+
+    if (isOnlineRoom && roomCode) {
+      publishRoomState(roomCode, {
+        type: 'RESTART_MATCH',
+        viewMode: 'GAME',
+        activeTeamId: 'alfa',
+        turnIndex: 1,
+        currentQuestionIdx: 0,
+        isGameStarted: true,
+        isGamePaused: false,
+        timer: 30,
+        timerExpiresAt: expiresAt
+      });
+    }
+  };
+
+  // Resetar Jogo e Voltar Todos pro Lobby
   const resetGame = () => {
     setTeams(INITIAL_TEAMS);
     setActiveTeamId('alfa');
@@ -925,7 +1083,11 @@ const sanitizeMembers = (membersList) => {
 
   // Ações da Barra de Apresentação
   const triggerDemoAction = (actionType) => {
-    if (actionType === 'ROLLBACK_DEMO') {
+    if (actionType === 'RESTART_MATCH') {
+      restartMatch();
+    } else if (actionType === 'RETURN_TO_LOBBY') {
+      resetGame();
+    } else if (actionType === 'ROLLBACK_DEMO') {
       processError(activeTeamId);
       processError(activeTeamId);
       processError(activeTeamId);
@@ -990,6 +1152,9 @@ const sanitizeMembers = (membersList) => {
     nextTurn,
     useSabotageCard,
     resetGame,
+    restartMatch,
+    sabotageAlert,
+    closeSabotageAlert,
     viewMode,
     setViewMode,
     joinTeamMember,

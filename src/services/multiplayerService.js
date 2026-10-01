@@ -91,7 +91,7 @@ export const subscribeToRoom = (roomCode, onMessage) => {
   // 1. Carrega histórico recente para recuperar o estado e membros já conectados (anti-cache)
   const loadHistory = async () => {
     try {
-      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=100&_t=${Date.now()}_${Math.random()}`, {
+      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=30&_t=${Date.now()}_${Math.random()}`, {
         headers: NO_CACHE_HEADERS,
         cache: 'no-store'
       });
@@ -111,17 +111,26 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     }
   };
 
-  // 2. Loop de Streaming em tempo real (long-poll contínuo com anti-cache)
+  // 2. Loop de Streaming em tempo real com timeout de segurança de 12s para o Edge não travar
   const pollStream = async () => {
     while (isSubscribed) {
+      let timeoutId = null;
       try {
         abortController = new AbortController();
+        timeoutId = setTimeout(() => {
+          try {
+            abortController.abort();
+          } catch (e) {}
+        }, 12000);
+
         const url = `https://ps.pubnub.com/subscribe/demo/${channel}/0/${currentTimetoken || '0'}?_t=${Date.now()}`;
         const res = await fetch(url, {
           signal: abortController.signal,
           headers: NO_CACHE_HEADERS,
           cache: 'no-store'
         });
+        clearTimeout(timeoutId);
+
         if (res.ok && isSubscribed) {
           const data = await res.json();
           if (Array.isArray(data) && Array.isArray(data[0])) {
@@ -133,20 +142,21 @@ export const subscribeToRoom = (roomCode, onMessage) => {
             }
           }
         } else {
-          await new Promise((r) => setTimeout(r, 600));
+          await new Promise((r) => setTimeout(r, 400));
         }
       } catch (err) {
+        if (timeoutId) clearTimeout(timeoutId);
         if (!isSubscribed) break;
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 600));
       }
     }
   };
 
-  // 3. Polling de redundância rápido a cada 1.5s com anti-cache (crucial para o Edge não congelar)
+  // 3. Polling de redundância rápido a cada 1.2s com anti-cache (crucial para o Edge não congelar)
   const redundancyInterval = setInterval(async () => {
     if (!isSubscribed) return;
     try {
-      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=15&_t=${Date.now()}_${Math.random()}`, {
+      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=10&_t=${Date.now()}_${Math.random()}`, {
         headers: NO_CACHE_HEADERS,
         cache: 'no-store'
       });
@@ -164,7 +174,7 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     } catch (e) {
       // tolerância silenciosa
     }
-  }, 1500);
+  }, 1200);
 
   loadHistory().then(() => {
     if (isSubscribed) {
