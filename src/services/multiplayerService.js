@@ -1,5 +1,5 @@
-// Service de Sincronização Multiplayer em Tempo Real (PubNub Streaming + BroadcastChannel v10)
-// Inclui proteção contra loops de histórico, self-echo e compatibilidade total com Edge/Chrome/Mobile
+// Service de Sincronização Multiplayer em Tempo Real (PubNub Streaming + BroadcastChannel v11)
+// Compatibilidade total e rigorosa com Microsoft Edge, Google Chrome, Safari e Mobile
 
 export const CLIENT_ID = typeof window !== 'undefined'
   ? `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -10,7 +10,7 @@ export const CLIENT_ID = typeof window !== 'undefined'
  */
 export const getChannelName = (roomCode) => {
   const clean = (roomCode || 'BD-MAIN').toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `bd_quest_${clean}_v10`;
+  return `bd_quest_${clean}_v11`;
 };
 
 /**
@@ -26,16 +26,8 @@ export const generateRoomCode = () => {
 };
 
 /**
- * Headers comuns com desativação total de cache HTTP para compatibilidade com Edge
- */
-const NO_CACHE_HEADERS = {
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-cache, no-store, must-revalidate',
-  'Pragma': 'no-cache'
-};
-
-/**
  * Publica uma mensagem / ação na sala online
+ * - Utiliza GET HTTP com URL-encoding: 100% livre de bloqueios CORS, sem preflight e compatível com Edge
  */
 export const publishRoomState = async (roomCode, message) => {
   if (!message) return false;
@@ -48,7 +40,7 @@ export const publishRoomState = async (roomCode, message) => {
     timestamp: Date.now()
   };
 
-  // 1. Broadcast instantâneo local (comunicação 0ms entre abas do mesmo navegador Chrome <-> Chrome ou Edge <-> Edge)
+  // 1. Broadcast instantâneo local (0ms entre abas no mesmo navegador)
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(`bc_${channel}`);
@@ -59,15 +51,18 @@ export const publishRoomState = async (roomCode, message) => {
     // Ignora restrições locais de sandbox
   }
 
-  // 2. Publicação na rede global PubNub (comunicação entre navegadores diferentes Chrome <-> Edge e Celular)
+  // 2. Publicação na rede global PubNub via GET (padrão confiável sem bloqueios no Edge/Chrome)
   try {
-    const res = await fetch(`https://ps.pubnub.com/publish/demo/demo/0/${channel}/0?_t=${Date.now()}_${Math.random()}`, {
-      method: 'POST',
-      headers: NO_CACHE_HEADERS,
-      cache: 'no-store',
-      body: JSON.stringify(payload)
+    const encodedPayload = encodeURIComponent(JSON.stringify(payload));
+    const url = `https://ps.pubnub.com/publish/demo/demo/0/${channel}/0/${encodedPayload}?_t=${Date.now()}`;
+    const res = await fetch(url, {
+      cache: 'no-store'
     });
-    return res.ok;
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) && data[0] === 1;
+    }
+    return false;
   } catch (err) {
     console.error("Erro ao publicar estado na sala:", err);
     return false;
@@ -78,22 +73,22 @@ export const publishRoomState = async (roomCode, message) => {
  * Inscreve um cliente para receber eventos em tempo real da sala
  * - Conecta via BroadcastChannel local (0ms)
  * - Conecta via streaming de PubNub (apenas eventos futuros a partir do momento da conexão)
- * - NUNCA faz polling de histórico repetitivo (elimina 100% o bug de tela piscando / ações repetidas)
- * - Filtra self-echo (mensagens enviadas por esta mesma aba são descartadas)
+ * - NUNCA faz polling de histórico repetitivo
+ * - Filtra self-echo
  */
 export const subscribeToRoom = (roomCode, onMessage) => {
   if (!roomCode) return () => {};
   const channel = getChannelName(roomCode);
 
   let isSubscribed = true;
-  let currentTimetoken = String(Date.now() * 10000);
+  let currentTimetoken = '0';
   let abortController = null;
   const seenMsgIds = new Set();
 
   const handleIncomingMessage = (msg) => {
     if (!msg || typeof msg !== 'object') return;
     
-    // 1. Evita self-echo: descarta mensagens que foram enviadas por esta mesma aba
+    // 1. Evita self-echo: descarta mensagens enviadas por esta mesma aba
     if (msg.senderId && msg.senderId === CLIENT_ID) return;
 
     // 2. Deduplicação por msgId exclusivo
@@ -121,30 +116,24 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     }
   } catch (e) {}
 
-  // 2. Obter timetoken inicial da PubNub para ouvir estritamente eventos a partir de AGORA
-  const initTimetokenAndStartStream = async () => {
+  // 2. Loop de Streaming em tempo real com PubNub
+  const startStream = async () => {
+    // Handshake inicial no timetoken 0: obtém o token de tempo atual do servidor instantaneamente sem histórico antigo
     try {
-      const timeRes = await fetch(`https://ps.pubnub.com/time/0?_t=${Date.now()}`, {
-        headers: NO_CACHE_HEADERS,
+      const initRes = await fetch(`https://ps.pubnub.com/subscribe/demo/${channel}/0/0?_t=${Date.now()}`, {
         cache: 'no-store'
       });
-      if (timeRes.ok) {
-        const timeData = await timeRes.json();
-        if (Array.isArray(timeData) && timeData[0]) {
-          currentTimetoken = String(timeData[0]);
+      if (initRes.ok) {
+        const initData = await initRes.json();
+        if (Array.isArray(initData) && initData[1]) {
+          currentTimetoken = String(initData[1]);
         }
       }
     } catch (e) {
       currentTimetoken = String(Date.now() * 10000);
     }
 
-    if (isSubscribed) {
-      pollStream();
-    }
-  };
-
-  // 3. Loop de Streaming em tempo real (long-polling HTTP nativo da PubNub)
-  const pollStream = async () => {
+    // Loop contínuo de escuta de mensagens em tempo real
     while (isSubscribed) {
       let timeoutId = null;
       try {
@@ -158,7 +147,6 @@ export const subscribeToRoom = (roomCode, onMessage) => {
         const url = `https://ps.pubnub.com/subscribe/demo/${channel}/0/${currentTimetoken}?_t=${Date.now()}`;
         const res = await fetch(url, {
           signal: abortController.signal,
-          headers: NO_CACHE_HEADERS,
           cache: 'no-store'
         });
         clearTimeout(timeoutId);
@@ -184,7 +172,7 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     }
   };
 
-  initTimetokenAndStartStream();
+  startStream();
 
   return () => {
     isSubscribed = false;

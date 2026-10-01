@@ -395,7 +395,8 @@ const sanitizeMembers = (membersList) => {
       // 9. AÇÃO: Requisição de Estado para Novos Clientes (ex: Edge conectando)
       if (msg.type === 'REQUEST_SYNC') {
         const cur = stateRef.current;
-        if (cur && (cur.isAdmin || (!cur.isAdmin && cur.isGameStarted))) {
+        const hasMembers = cur && cur.teams && cur.teams.some((t) => t.members && t.members.length > 0);
+        if (cur && (cur.isAdmin || cur.isGameStarted || hasMembers)) {
           publishRoomState(roomCode, {
             type: 'SYNC_STATE',
             viewMode: cur.viewMode,
@@ -449,13 +450,18 @@ const sanitizeMembers = (membersList) => {
       }
     });
 
-    // Solicita sincronização imediata dos peers já online (crucial para o Edge sincronizar no primeiro segundo)
-    const syncTimeout = setTimeout(() => {
+    // Solicita sincronização imediata dos peers já online (em 400ms e repete em 1600ms para Edge e conexões lentas)
+    const syncTimeout1 = setTimeout(() => {
       publishRoomState(roomCode, { type: 'REQUEST_SYNC' });
-    }, 350);
+    }, 400);
+
+    const syncTimeout2 = setTimeout(() => {
+      publishRoomState(roomCode, { type: 'REQUEST_SYNC' });
+    }, 1600);
 
     return () => {
-      clearTimeout(syncTimeout);
+      clearTimeout(syncTimeout1);
+      clearTimeout(syncTimeout2);
       unsubscribe();
     };
   }, [roomCode, isOnlineRoom]);
@@ -800,12 +806,7 @@ const sanitizeMembers = (membersList) => {
       setTimer((prev) => (prev !== remainingSecs ? remainingSecs : prev));
 
       if (remainingSecs <= 0) {
-        // Dispara timeout se for ADM ou sala offline
-        if (isAdmin || !isOnlineRoom || diffMs <= -1500) {
-          handleTimeOut();
-        } else {
-          setTimerActive(false);
-        }
+        handleTimeOut();
       }
     };
 
@@ -819,10 +820,13 @@ const sanitizeMembers = (membersList) => {
     setTimerActive(false);
     setTimerExpiresAt(null);
     setTimer(0);
+    setIsAnswered(true);
+    setSelectedOption(null);
     const activeTeam = teams.find((t) => t.id === activeTeamId);
     const timeoutResult = {
       isCorrect: false,
-      explanation: 'TEMPO ESGOTADO! A transação da equipe excedeu o timeout.',
+      isTimeout: true,
+      explanation: 'TEMPO ESGOTADO! A equipe não enviou a resposta em 30 segundos e sofreu penalidade.',
       answeredBy: 'Tempo Esgotado (Sistema)',
       teamName: activeTeam?.name || 'Equipe'
     };
@@ -833,6 +837,7 @@ const sanitizeMembers = (membersList) => {
       publishRoomState(roomCode, {
         type: 'SYNC_STATE',
         isAnswered: true,
+        selectedOption: null,
         answerResult: timeoutResult,
         timer: 0,
         timerExpiresAt: null
@@ -862,7 +867,7 @@ const sanitizeMembers = (membersList) => {
 
   // Confirmar Resposta da Equipe (Acerto = +150 PTS e avanço)
   const handleAnswer = (optionIndex, answeringUser = null) => {
-    if (!isGameStarted || isGamePaused || isAnswered || winner) return;
+    if (!isGameStarted || isGamePaused || isAnswered || winner || timer <= 0) return;
 
     setSelectedOption(optionIndex);
     setIsAnswered(true);

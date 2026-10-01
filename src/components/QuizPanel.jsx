@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, CheckCircle2, XCircle, ArrowRight, Play, Pause, ShieldAlert, Lock } from 'lucide-react';
+import { BookOpen, CheckCircle2, XCircle, ArrowRight, Play, Pause, ShieldAlert, Lock, Clock } from 'lucide-react';
 
 export default function QuizPanel({
   currentQuestion,
@@ -145,26 +145,50 @@ export default function QuizPanel({
                 </button>
               )}
 
-              <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
-                <svg className="w-14 h-14 -rotate-90" viewBox="0 0 48 48">
-                  <circle className="text-arcade-deep" cx="24" cy="24" fill="transparent" r="21" stroke="currentColor" strokeWidth="4"></circle>
+              {/* Circular Sci-Fi Reactor Timer (High-DPI Vector, Sem Borda Quadrada) */}
+              <div
+                className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shrink-0 bg-slate-950/90 border transition-all duration-300 shadow-inner ${
+                  timer > 15
+                    ? 'border-cyan-400/50 shadow-[0_0_16px_rgba(0,245,255,0.3)]'
+                    : timer > 7
+                    ? 'border-amber-400/50 shadow-[0_0_16px_rgba(255,183,3,0.3)]'
+                    : 'border-red-500 shadow-[0_0_20px_rgba(255,23,68,0.45)] animate-pulse'
+                }`}
+              >
+                <svg className="w-full h-full -rotate-90 p-1 overflow-visible" viewBox="0 0 100 100">
+                  {/* Trilha de fundo */}
                   <circle
-                    className="filter drop-shadow-[0_0_8px_rgba(0,245,255,0.9)] transition-all duration-1000 ease-linear"
-                    cx="24"
-                    cy="24"
-                    fill="transparent"
-                    r="21"
-                    stroke={timer > 15 ? "#00f5ff" : timer > 7 ? "#ffb703" : "#ff3366"}
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="#0b172a"
+                    strokeWidth="8"
+                  />
+                  {/* Trilha de progresso nítida */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke={timer > 15 ? "#00f5ff" : timer > 7 ? "#ffb703" : "#ff1744"}
+                    strokeWidth="8"
                     strokeLinecap="round"
-                    strokeWidth="4"
-                    strokeDasharray="132"
-                    strokeDashoffset={132 - (timer / maxTime) * 132}
-                  ></circle>
+                    strokeDasharray="251.3"
+                    strokeDashoffset={251.3 - (Math.max(0, timer) / maxTime) * 251.3}
+                    className="transition-all duration-300 ease-out"
+                  />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className={`font-display font-black text-sm tracking-tighter ${
-                    timer > 15 ? 'text-arcade-cyan' : timer > 7 ? 'text-amber-400' : 'text-red-500 animate-pulse'
-                  }`}>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span
+                    className={`font-display font-black text-xs sm:text-sm tracking-tight leading-none ${
+                      timer > 15
+                        ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(0,245,255,0.8)]'
+                        : timer > 7
+                        ? 'text-amber-300 drop-shadow-[0_0_8px_rgba(255,183,3,0.8)]'
+                        : 'text-red-400 drop-shadow-[0_0_10px_rgba(255,23,68,0.9)] animate-pulse'
+                    }`}
+                  >
                     {timer}s
                   </span>
                 </div>
@@ -235,13 +259,15 @@ export default function QuizPanel({
             {currentQuestion.options.map((optionText, idx) => {
               const isSelected = selectedOption === idx;
               const isCorrectAnswer = idx === currentQuestion.correctIndex;
-              const canInteract = isGameStarted && !isGamePaused && !isAnswered && canTeamAnswer;
+              const canInteract = isGameStarted && !isGamePaused && !isAnswered && canTeamAnswer && timer > 0;
 
               let cardStyle = "border-slate-700 bg-slate-900/90 hover:border-cyan-400 hover:bg-arcade-surface/60 text-slate-200";
               let btnLetterStyle = "bg-arcade-card border-cyan-400/40 text-cyan-300 group-hover:text-white group-hover:border-cyan-300";
 
               if (!isGameStarted || isGamePaused) {
                 cardStyle = "border-slate-800 bg-slate-950/60 text-slate-400 opacity-75 cursor-not-allowed";
+              } else if (timer <= 0 && !isAnswered) {
+                cardStyle = "border-red-900/60 bg-red-950/30 text-red-400/80 opacity-60 cursor-not-allowed";
               } else if (!canTeamAnswer && !isAnswered) {
                 cardStyle = "border-slate-800 bg-slate-950/50 text-slate-500 opacity-60 cursor-not-allowed";
               } else if (isAnswered) {
@@ -296,16 +322,24 @@ export default function QuizPanel({
               <div className="flex items-start sm:items-center gap-3">
                 {selectedOption === currentQuestion.correctIndex ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+                ) : answerResult?.isTimeout ? (
+                  <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 sm:mt-0 animate-pulse" />
                 ) : (
                   <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5 sm:mt-0" />
                 )}
                 <div className="text-xs">
                   <strong className="font-bold text-white uppercase block">
-                    {selectedOption === currentQuestion.correctIndex ? '🎉 RESPOSTA CORRETA!' : '❌ RESPOSTA INCORRETA!'}
+                    {selectedOption === currentQuestion.correctIndex
+                      ? '🎉 RESPOSTA CORRETA!'
+                      : answerResult?.isTimeout
+                      ? '⏰ TEMPO ESGOTADO! RESPOSTA INCORRETA'
+                      : '❌ RESPOSTA INCORRETA!'}
                   </strong>
                   <span>
                     {selectedOption === currentQuestion.correctIndex
                       ? `A equipe ${answerResult?.teamName || currentPlayer || 'ativa'} acertou a questão e avançou no Overworld!`
+                      : answerResult?.isTimeout
+                      ? `O tempo limite de 30 segundos expirou antes da resposta. A opção correta era: `
                       : `A equipe ${answerResult?.teamName || currentPlayer || 'ativa'} errou. A opção correta era: `}
                     {selectedOption !== currentQuestion.correctIndex && (
                       <strong className="text-emerald-300 font-mono font-bold">{optionLetters[currentQuestion.correctIndex]}</strong>
@@ -316,7 +350,9 @@ export default function QuizPanel({
 
               {/* Tag visual de quem respondeu a pergunta */}
               <div className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-slate-950/90 border border-cyan-400/30 text-slate-300 flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-inner">
-                <span className="text-cyan-400 font-bold">👤 Respondido por:</span>
+                <span className="text-cyan-400 font-bold">
+                  {answerResult?.isTimeout ? '⏱️ Status:' : '👤 Respondido por:'}
+                </span>
                 <span className="text-white font-bold tracking-wide">
                   {answerResult?.answeredBy || (studentName ? studentName.trim() : (currentPlayer || 'Jogador'))}
                 </span>
@@ -367,16 +403,18 @@ export default function QuizPanel({
             </button>
           ) : (
             <button
-              disabled={selectedOption === null || isGamePaused || !canTeamAnswer}
-              onClick={() => selectedOption !== null && canTeamAnswer && onAnswer(selectedOption, studentName)}
+              disabled={selectedOption === null || isGamePaused || !canTeamAnswer || timer <= 0}
+              onClick={() => selectedOption !== null && canTeamAnswer && timer > 0 && onAnswer(selectedOption, studentName)}
               className={`relative group px-6 py-2.5 rounded-2xl font-display text-xs font-black tracking-wider uppercase text-slate-950 transition-all transform flex items-center gap-2.5 border border-white/40 ${
-                selectedOption !== null && !isGamePaused && canTeamAnswer
+                selectedOption !== null && !isGamePaused && canTeamAnswer && timer > 0
                   ? 'bg-gradient-to-r from-arcade-emerald via-arcade-cyan to-teal-300 hover:from-teal-300 hover:to-arcade-emerald shadow-glow-cyan cursor-pointer active:scale-95'
                   : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60 border-slate-700'
               }`}
             >
               <span>
-                {!canTeamAnswer
+                {timer <= 0
+                  ? '⏰ TEMPO ESGOTADO'
+                  : !canTeamAnswer
                   ? `AGUARDANDO A ${(activeTeam?.name || 'OUTRA EQUIPE').toUpperCase()}`
                   : 'CONFIRMAR DECISÃO DA EQUIPE'}
               </span>
