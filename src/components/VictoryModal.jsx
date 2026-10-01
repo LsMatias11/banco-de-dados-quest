@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   Trophy, Award, RotateCcw, CheckCircle2, Sparkles, Share2, 
-  FileText, Star, X, Check, ArrowRight, ShieldCheck, Zap, Database
+  FileText, Star, X, Check, ArrowRight, ShieldCheck, Zap, Database, UserX
 } from 'lucide-react';
 import { BINGO_BADGES } from '../data/gameData';
 
@@ -41,8 +41,25 @@ export default function VictoryModal({ winner, teams = [], onReset }) {
     } catch (e) {}
   };
 
-  // Normalização da equipe campeã
-  const winningTeam = typeof winner === 'object' ? winner : teams.find((t) => t.id === winner) || teams[0] || {};
+  const BOTS = ['Dev', 'Dev1', 'Dev2', 'Dev3', 'Dev4', 'DBA', 'DBA2', 'DBA3', 'DBA4', 'Arq', 'Arq2', 'Arq3', 'Arq4', 'Anl', 'Anl2', 'Anl3', 'Anl4'];
+
+  const sanitizeMembers = (membersList) => {
+    if (!Array.isArray(membersList)) return [];
+    const unique = [];
+    membersList.forEach((m) => {
+      const nameStr = typeof m === 'string' ? m : m?.name;
+      if (!nameStr || typeof nameStr !== 'string') return;
+      const trimmed = nameStr.trim();
+      if (trimmed.length >= 2 && !BOTS.includes(trimmed) && !unique.includes(trimmed)) {
+        unique.push(trimmed);
+      }
+    });
+    return unique;
+  };
+
+  // Normalização e busca viva da equipe campeã
+  const winningTeamId = typeof winner === 'object' ? winner.id : winner;
+  const winningTeam = teams.find((t) => t.id === winningTeamId) || (typeof winner === 'object' ? winner : teams[0]) || {};
   const winningGrid = winningTeam.bingoGrid || [
     [false, false, false],
     [false, false, false],
@@ -62,6 +79,25 @@ export default function VictoryModal({ winner, teams = [], onReset }) {
   // Badges conquistados pelo campeão
   const badgesUnlockedCount = winningGrid.flat().filter(Boolean).length;
 
+  // Texto descritivo da combinação vencedora
+  const getWinningComboText = () => {
+    for (let r = 0; r < 3; r++) {
+      if (winningGrid[r][0] && winningGrid[r][1] && winningGrid[r][2]) {
+        return `Linha Horizontal ${r + 1} Validada`;
+      }
+    }
+    for (let c = 0; c < 3; c++) {
+      if (winningGrid[0][c] && winningGrid[1][c] && winningGrid[2][c]) {
+        return `Coluna Vertical ${c + 1} Validada`;
+      }
+    }
+    if (winningGrid[0][0] && winningGrid[1][1] && winningGrid[2][2]) return 'Diagonal Principal Validada';
+    if (winningGrid[0][2] && winningGrid[1][1] && winningGrid[2][0]) return 'Diagonal Secundária Validada';
+    if (badgesUnlockedCount >= 5) return 'Coluna 1 + Badges Validados';
+    if (badgesUnlockedCount > 0) return `${badgesUnlockedCount} Badges Conquistadas`;
+    return 'Bingo Validado';
+  };
+
   // Ordenação de equipes para o placar consolidado (1º a 4º)
   const sortedTeams = [...teams].sort((a, b) => {
     if (a.id === winningTeam.id) return -1;
@@ -70,16 +106,8 @@ export default function VictoryModal({ winner, teams = [], onReset }) {
     return (b.credits || 0) - (a.credits || 0);
   });
 
-  // MVPs / Membros em destaque
-  const rawMembers = winningTeam.members && winningTeam.members.length > 0
-    ? winningTeam.members.map((m) => (typeof m === 'string' ? m : m.name))
-    : ['Lucas Silva', 'Mariana Costa', 'Carlos Eduardo'];
-
-  const mvps = [
-    { name: rawMembers[0] || 'Líder Relacional', rank: '1º', medal: 'OURO', score: '100% DE PRECISÃO', badge: 'Mestre das Tuplas & Círculo Perfeito' },
-    { name: rawMembers[1] || 'Arquiteto de Dados', rank: '2º', medal: 'PRATA', score: '91.6% DE PRECISÃO', badge: 'Especialista em Normalização & 1FN' },
-    { name: rawMembers[2] || 'Engenheiro ACID', rank: '3º', medal: 'BRONZE', score: '83.3% DE PRECISÃO', badge: 'Guardião ACID & Transações' }
-  ];
+  // MVPs REAIS (Apenas alunos verdadeiros cadastrados, sem nomes genéricos!)
+  const realMembers = sanitizeMembers(winningTeam.members);
 
   const handleShare = () => {
     const text = `🏆 Vitória Relacional no BD Quest!\nA Equipe ${winningTeam.name || 'Alfa'} conquistou o 1º Lugar com ${winningTeam.credits || 2850} PTS e completou o Bingo Relacional (C.J. Date)!`;
@@ -403,7 +431,7 @@ export default function VictoryModal({ winner, teams = [], onReset }) {
             <div className="mt-2.5 text-center">
               <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-400/40 inline-flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Linha Vencedora Validada
+                {getWinningComboText()}
               </span>
             </div>
           </div>
@@ -417,57 +445,86 @@ export default function VictoryModal({ winner, teams = [], onReset }) {
                   MVPs DA PARTIDA
                 </h3>
                 <span className="text-[9px] font-mono text-cyan-300 font-bold bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-400/50 uppercase">
-                  DESTAQUES
+                  {realMembers.length > 0 ? 'DESTAQUES' : 'TESTE'}
                 </span>
               </div>
 
-              {/* Lista de MVPs */}
-              <div className="space-y-2">
-                {mvps.map((mvp, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-2.5 rounded-xl border flex flex-col gap-1.5 transition ${
-                      idx === 0
-                        ? 'bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-950 border-amber-400/70 shadow-sm shadow-amber-500/20'
-                        : 'bg-slate-900/80 border-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-6 h-6 rounded-lg font-black text-xs flex items-center justify-center ${
+              {/* Lista de MVPs Reais ou Estado de Teste sem Alunos */}
+              {realMembers.length === 0 ? (
+                <div className="p-5 rounded-2xl bg-slate-900/60 border border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center py-7">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 mb-2">
+                    <UserX className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <span className="font-bold text-slate-300 text-sm">Não houve MVPs registrados</span>
+                  <p className="text-xs font-mono text-slate-400 mt-1 max-w-xs">
+                    Nenhum aluno entrou nominalmente na equipe durante a partida.
+                  </p>
+                  <span className="mt-3 text-[10px] font-mono text-amber-300/80 bg-amber-950/60 px-2.5 py-1 rounded-full border border-amber-500/30">
+                    Vitória Coletiva • Modo de Teste
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {realMembers.slice(0, 3).map((memberName, idx) => {
+                    const medals = [
+                      { rank: '1º', medal: 'OURO', role: 'Líder Relacional', score: '100% DE PRECISÃO', badge: 'Mestre das Tuplas & Círculo Perfeito', bar: '100%' },
+                      { rank: '2º', medal: 'PRATA', role: 'Arquiteto de Dados', score: '91.6% DE PRECISÃO', badge: 'Especialista em Normalização & 1FN', bar: '91%' },
+                      { rank: '3º', medal: 'BRONZE', role: 'Engenheiro ACID', score: '83.3% DE PRECISÃO', badge: 'Guardião ACID & Transações', bar: '83%' }
+                    ];
+                    const meta = medals[idx] || medals[2];
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-xl border flex flex-col gap-1.5 transition ${
                           idx === 0
-                            ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700'
-                        }`}>
-                          {mvp.rank}
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-white text-[12px]">{mvp.name}</span>
-                            <span className="text-[8px] font-mono font-bold text-amber-300 bg-amber-950 px-1 rounded border border-amber-500/40">
-                              {mvp.medal}
+                            ? 'bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-950 border-amber-400/70 shadow-sm shadow-amber-500/20'
+                            : 'bg-slate-900/80 border-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-6 h-6 rounded-lg font-black text-xs flex items-center justify-center ${
+                              idx === 0
+                                ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950'
+                                : 'bg-slate-800 text-slate-300 border border-slate-700'
+                            }`}>
+                              {meta.rank}
                             </span>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-white text-[12px]">{memberName}</span>
+                                <span className="text-[8px] font-mono font-bold text-amber-300 bg-amber-950 px-1 rounded border border-amber-500/40">
+                                  {meta.medal}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-mono text-cyan-300">{winningTeam.name || 'Alfa'}</span>
+                            </div>
                           </div>
-                          <span className="text-[10px] font-mono text-cyan-300">{winningTeam.name || 'Alfa'}</span>
+                          <div className="text-right">
+                            <span className="text-[10px] font-mono text-emerald-400 font-bold block">{meta.score}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+                          <span className="text-[9px] font-mono text-slate-400 truncate">{meta.badge}</span>
+                          <div className="w-14 h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 shrink-0">
+                            <div 
+                              className="bg-gradient-to-r from-cyan-400 to-amber-300 h-full"
+                              style={{ width: meta.bar }}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-mono text-emerald-400 font-bold block">{mvp.score}</span>
-                      </div>
+                    );
+                  })}
+                  {realMembers.length > 3 && (
+                    <div className="text-center text-[10px] font-mono text-slate-400 pt-1">
+                      + {realMembers.length - 3} outros integrantes na equipe
                     </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
-                      <span className="text-[9px] font-mono text-slate-400 truncate">{mvp.badge}</span>
-                      <div className="w-14 h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 shrink-0">
-                        <div 
-                          className="bg-gradient-to-r from-cyan-400 to-amber-300 h-full"
-                          style={{ width: idx === 0 ? '100%' : idx === 1 ? '91%' : '83%' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Recompensas Acadêmicas */}

@@ -895,23 +895,45 @@ const sanitizeMembers = (membersList) => {
           if (t.id !== activeTeamId) return t;
 
           const newPos = Math.min(15, t.position + 1);
+          let newCredits = t.credits + 150;
+          const newGrid = t.bingoGrid ? t.bingoGrid.map((row) => [...row]) : createEmptyBingo();
 
-          if (currentQuestion.badgeId) unlockBadge(t.id, currentQuestion.badgeId);
-          if (newPos === 3) unlockBadge(t.id, 'tuples');
-          if (newPos === 6) unlockBadge(t.id, 'degree');
-          if (newPos === 9) unlockBadge(t.id, 'atomic');
-          if (newPos === 12) unlockBadge(t.id, 'relvars');
-          if (newPos === 15) unlockBadge(t.id, 'purist');
+          // Desbloquear badges correspondentes aos nós e pergunta atual diretamente na nova grade
+          const badgesToUnlock = [];
+          if (currentQuestion.badgeId) badgesToUnlock.push(currentQuestion.badgeId);
+          if (newPos >= 3) badgesToUnlock.push('tuples');
+          if (newPos >= 6) badgesToUnlock.push('degree');
+          if (newPos >= 9) badgesToUnlock.push('atomic');
+          if (newPos >= 12) badgesToUnlock.push('relvars');
+          if (newPos >= 15) badgesToUnlock.push('purist');
 
-          setTimeout(() => {
-            const hasBingo = checkBingoWin(t.bingoGrid);
-            if (newPos >= 15 && hasBingo) {
-              setWinner(t);
-              confetti({ particleCount: 220, spread: 100 });
-            }
-          }, 300);
+          badgesToUnlock.forEach((bId) => {
+            BINGO_BADGES.forEach((row, r) => {
+              row.forEach((b, c) => {
+                if (b.id === bId && !newGrid[r][c]) {
+                  newGrid[r][c] = true;
+                  newCredits += 250;
+                }
+              });
+            });
+          });
 
-          return { ...t, position: newPos, errorCount: 0, credits: t.credits + 150 };
+          const hasBingo = checkBingoWin(newGrid);
+          const updatedTeam = {
+            ...t,
+            position: newPos,
+            errorCount: 0,
+            credits: newCredits,
+            bingoGrid: newGrid
+          };
+
+          if (newPos >= 15 && hasBingo) {
+            winningTeam = updatedTeam;
+            setWinner(updatedTeam);
+            confetti({ particleCount: 220, spread: 100 });
+          }
+
+          return updatedTeam;
         });
 
         if (isOnlineRoom && roomCode) {
@@ -1157,11 +1179,39 @@ const sanitizeMembers = (membersList) => {
         prev.map((t) => (t.id === activeTeamId ? { ...t, position: Math.min(15, t.position + 5), credits: t.credits + 300 } : t))
       );
     } else if (actionType === 'VICTORY_DEMO') {
-      triggerDemoAction('FILL_BINGO_DEMO');
-      setTeams((prev) =>
-        prev.map((t) => (t.id === activeTeamId ? { ...t, position: 15, credits: t.credits + 500 } : t))
-      );
-      setWinner(activeTeam);
+      setTeams((prev) => {
+        let winTeam = null;
+        const updated = prev.map((t) => {
+          if (t.id !== activeTeamId) return t;
+          const newGrid = t.bingoGrid ? t.bingoGrid.map((r) => [...r]) : createEmptyBingo();
+          newGrid[0][0] = true; // tuples
+          newGrid[0][1] = true; // degree
+          newGrid[0][2] = true; // body (linha 1 completa!)
+          newGrid[1][0] = true; // atomic
+          newGrid[2][0] = true; // purist (coluna 1 completa!)
+          const finalT = {
+            ...t,
+            position: 15,
+            credits: t.credits + 1500,
+            bingoGrid: newGrid
+          };
+          winTeam = finalT;
+          return finalT;
+        });
+
+        if (winTeam) {
+          setWinner(winTeam);
+          confetti({ particleCount: 220, spread: 100 });
+          if (isOnlineRoom && roomCode) {
+            publishRoomState(roomCode, {
+              type: 'SYNC_STATE',
+              teams: updated.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+              winner: winTeam
+            });
+          }
+        }
+        return updated;
+      });
     }
   };
 
