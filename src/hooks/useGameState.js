@@ -68,7 +68,12 @@ const INITIAL_TEAMS = [
 export function useGameState() {
   const savedState = loadFromLocalStorage();
 
-  const [teams, setTeams] = useState(savedState?.teams || INITIAL_TEAMS);
+  const [teams, setTeams] = useState(() => {
+    if (savedState?.isGameStarted && Array.isArray(savedState?.teams)) {
+      return savedState.teams;
+    }
+    return INITIAL_TEAMS;
+  });
   const [activeTeamId, setActiveTeamId] = useState(savedState?.activeTeamId || 'alfa');
   const [turnIndex, setTurnIndex] = useState(savedState?.turnIndex || 1);
 
@@ -180,32 +185,40 @@ const sanitizeMembers = (membersList) => {
   return unique;
 };
 
+  // Blacklist de membros removidos pelo ADM nesta sessão (evita que voltem por syncs locais)
+  const tombstonesRef = useRef(new Set());
+
   const mergeTeamData = (remoteTeams, currentLocalTeams = teams) => {
     if (!Array.isArray(remoteTeams) || remoteTeams.length === 0) return currentLocalTeams || INITIAL_TEAMS;
 
-    // Mapa para garantir que cada aluno só pertença a UMA única equipe em qualquer navegador
     const studentTeamMap = new Map();
 
-    // 1. Prioriza dados dos times remotos
+    // 1. Processa estritamente os times remotos recebidos
     remoteTeams.forEach((rTeam) => {
       if (!rTeam || !rTeam.id) return;
       const mems = sanitizeMembers(rTeam.members || []);
       mems.forEach((name) => {
-        studentTeamMap.set(name.toLowerCase(), { teamId: rTeam.id, originalName: name });
-      });
-    });
-
-    // 2. Preserva membros locais recém-adicionados se o remoto ainda não souber deles
-    (currentLocalTeams || []).forEach((lTeam) => {
-      if (!lTeam || !lTeam.id) return;
-      const mems = sanitizeMembers(lTeam.members || []);
-      mems.forEach((name) => {
         const lower = name.toLowerCase();
-        if (!studentTeamMap.has(lower)) {
-          studentTeamMap.set(lower, { teamId: lTeam.id, originalName: name });
+        // Se foi deletado pelo ADM, não reinsere de forma alguma
+        if (!tombstonesRef.current.has(lower)) {
+          studentTeamMap.set(lower, { teamId: rTeam.id, originalName: name });
         }
       });
     });
+
+    // 2. Apenas preserva o próprio nome do aluno local caso ele tenha acabado de entrar e ainda não foi sincronizado
+    const myName = (typeof window !== 'undefined' ? localStorage.getItem('bd_quest_student_name') : '')?.trim();
+    if (myName && myName.length >= 2) {
+      const myLower = myName.toLowerCase();
+      if (!tombstonesRef.current.has(myLower) && !studentTeamMap.has(myLower)) {
+        const myTeam = (currentLocalTeams || []).find((lt) =>
+          sanitizeMembers(lt.members || []).some((m) => m.toLowerCase() === myLower)
+        );
+        if (myTeam) {
+          studentTeamMap.set(myLower, { teamId: myTeam.id, originalName: myName });
+        }
+      }
+    }
 
     return INITIAL_TEAMS.map((initTeam) => {
       const local = (currentLocalTeams || []).find((l) => l.id === initTeam.id);
@@ -268,6 +281,9 @@ const sanitizeMembers = (membersList) => {
         const cleanLower = clean.toLowerCase();
         const prevCleanLower = previousName ? previousName.trim().toLowerCase() : null;
 
+        // Se o aluno entrar novamente, retira da blacklist de deletados
+        tombstonesRef.current.delete(cleanLower);
+
         setTeams((prevTeams) => {
           return prevTeams.map((team) => {
             let members = sanitizeMembers(team.members);
@@ -295,6 +311,9 @@ const sanitizeMembers = (membersList) => {
         const { studentName, teamId } = msg;
         if (!studentName) return;
         const cleanLower = studentName.trim().toLowerCase();
+
+        // Registra na blacklist para nunca ser ressuscitado por sincronizações locais
+        tombstonesRef.current.add(cleanLower);
 
         setTeams((prevTeams) => {
           return prevTeams.map((team) => {
@@ -347,6 +366,10 @@ const sanitizeMembers = (membersList) => {
 
       // 6. AÇÃO: Resetar Jogo Completo e Voltar pro Lobby
       if (msg.type === 'RESET_GAME') {
+        tombstonesRef.current.clear();
+        try {
+          localStorage.removeItem('BD_QUEST_GAME_STATE_V2');
+        } catch (e) {}
         setTeams(INITIAL_TEAMS);
         setActiveTeamId('alfa');
         setTurnIndex(1);
@@ -559,6 +582,8 @@ const sanitizeMembers = (membersList) => {
   const removeTeamMember = useCallback(({ teamId, studentName }) => {
     if (!studentName) return;
     const cleanName = studentName.trim();
+    const cleanLower = cleanName.toLowerCase();
+    tombstonesRef.current.add(cleanLower);
 
     setTeams((prevTeams) => {
       const updatedTeams = prevTeams.map((team) => {
@@ -566,7 +591,7 @@ const sanitizeMembers = (membersList) => {
         return {
           ...team,
           members: sanitizeMembers(team.members).filter(
-            (m) => (typeof m === 'string' ? m : m.name) !== cleanName
+            (m) => (typeof m === 'string' ? m : m.name).trim().toLowerCase() !== cleanLower
           )
         };
       });
@@ -613,23 +638,33 @@ const sanitizeMembers = (membersList) => {
     return true;
   };
 
-  // Auto-salvar no LocalStorage
+  // Auto-salvar no LocalStorage (no Lobby, não salva listas temporárias de membros para não criar fantasmas ao reabrir)
   useEffect(() => {
-    saveToLocalStorage({
-      teams,
-      activeTeamId,
-      turnIndex,
-      isGameStarted,
-      isGamePaused,
-      isAdmin,
-      adminPassword,
-      activeSabotages,
-      professorName,
-      currentQuestionIdx,
-      winner,
-      roomCode,
-      isOnlineRoom
-    });
+    if (isGameStarted) {
+      saveToLocalStorage({
+        teams,
+        activeTeamId,
+        turnIndex,
+        isGameStarted,
+        isGamePaused,
+        isAdmin,
+        adminPassword,
+        activeSabotages,
+        professorName,
+        currentQuestionIdx,
+        winner,
+        roomCode,
+        isOnlineRoom
+      });
+    } else {
+      saveToLocalStorage({
+        isAdmin,
+        adminPassword,
+        professorName,
+        roomCode,
+        isOnlineRoom
+      });
+    }
   }, [teams, activeTeamId, turnIndex, isGameStarted, isGamePaused, isAdmin, adminPassword, activeSabotages, professorName, currentQuestionIdx, winner, roomCode, isOnlineRoom]);
 
   // Cadastrar nova Equipe
@@ -1192,6 +1227,11 @@ const sanitizeMembers = (membersList) => {
 
   // Resetar Jogo e Voltar Todos pro Lobby
   const resetGame = () => {
+    tombstonesRef.current.clear();
+    try {
+      localStorage.removeItem('BD_QUEST_GAME_STATE_V2');
+    } catch (e) {}
+
     setTeams(INITIAL_TEAMS);
     setActiveTeamId('alfa');
     setTurnIndex(1);
