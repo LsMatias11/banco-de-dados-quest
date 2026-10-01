@@ -182,32 +182,58 @@ const sanitizeMembers = (membersList) => {
 
   const mergeTeamData = (remoteTeams, currentLocalTeams = teams) => {
     if (!Array.isArray(remoteTeams) || remoteTeams.length === 0) return currentLocalTeams || INITIAL_TEAMS;
+
+    // Mapa para garantir que cada aluno só pertença a UMA única equipe em qualquer navegador
+    const studentTeamMap = new Map();
+
+    // 1. Prioriza dados dos times remotos
+    remoteTeams.forEach((rTeam) => {
+      if (!rTeam || !rTeam.id) return;
+      const mems = sanitizeMembers(rTeam.members || []);
+      mems.forEach((name) => {
+        studentTeamMap.set(name.toLowerCase(), { teamId: rTeam.id, originalName: name });
+      });
+    });
+
+    // 2. Preserva membros locais recém-adicionados se o remoto ainda não souber deles
+    (currentLocalTeams || []).forEach((lTeam) => {
+      if (!lTeam || !lTeam.id) return;
+      const mems = sanitizeMembers(lTeam.members || []);
+      mems.forEach((name) => {
+        const lower = name.toLowerCase();
+        if (!studentTeamMap.has(lower)) {
+          studentTeamMap.set(lower, { teamId: lTeam.id, originalName: name });
+        }
+      });
+    });
+
     return INITIAL_TEAMS.map((initTeam) => {
       const local = (currentLocalTeams || []).find((l) => l.id === initTeam.id);
       const remote = remoteTeams.find((r) => r && (r.id === initTeam.id || r.name === initTeam.name));
-      if (!remote) return local || initTeam;
+      if (!remote && !local) return initTeam;
 
-      // Unir membros locais e remotos para garantir que ninguém seja apagado por overwrite acidental
-      const localMembers = sanitizeMembers(local?.members || []);
-      const remoteMembers = sanitizeMembers(remote.members || []);
-      const combined = Array.from(new Set([...remoteMembers, ...localMembers]));
+      const teamMembers = [];
+      studentTeamMap.forEach((val) => {
+        if (val.teamId === initTeam.id && teamMembers.length < 8) {
+          teamMembers.push(val.originalName);
+        }
+      });
 
       return {
         ...initTeam,
-        ...remote,
-        members: combined,
-        credits: typeof remote.credits === 'number' ? remote.credits : (local?.credits ?? initTeam.credits),
-        position: typeof remote.position === 'number' ? remote.position : (local?.position ?? initTeam.position),
-        errorCount: typeof remote.errorCount === 'number' ? remote.errorCount : (local?.errorCount ?? initTeam.errorCount),
-        sabotages: Array.isArray(remote.sabotages) ? remote.sabotages : (local?.sabotages ?? initTeam.sabotages),
-        bingoGrid: Array.isArray(remote.bingoGrid) ? remote.bingoGrid : (local?.bingoGrid ?? initTeam.bingoGrid)
+        ...(remote || local),
+        members: teamMembers,
+        credits: typeof remote?.credits === 'number' ? remote.credits : (local?.credits ?? initTeam.credits),
+        position: typeof remote?.position === 'number' ? remote.position : (local?.position ?? initTeam.position),
+        errorCount: typeof remote?.errorCount === 'number' ? remote.errorCount : (local?.errorCount ?? initTeam.errorCount),
+        sabotages: Array.isArray(remote?.sabotages) ? remote.sabotages : (local?.sabotages ?? initTeam.sabotages),
+        bingoGrid: Array.isArray(remote?.bingoGrid) ? remote.bingoGrid : (local?.bingoGrid ?? initTeam.bingoGrid)
       };
     });
   };
 
   // Refs de sincronização e estado estável para evitar loops de render
   const stateRef = useRef();
-  const lastSyncTimestampRef = useRef(0);
   stateRef.current = {
     isAdmin,
     isGameStarted,
@@ -233,33 +259,30 @@ const sanitizeMembers = (membersList) => {
     const unsubscribe = subscribeToRoom(roomCode, (msg) => {
       if (!msg || typeof msg !== 'object') return;
 
-      // Proteção de integridade temporal: descarta mensagens atrasadas ou fora de ordem
-      if (msg.timestamp) {
-        if (lastSyncTimestampRef.current && msg.timestamp < lastSyncTimestampRef.current) {
-          return;
-        }
-        lastSyncTimestampRef.current = msg.timestamp;
-      }
-
       // 1. AÇÃO: Entrada / Troca de Equipe de um Aluno
       if (msg.type === 'JOIN_MEMBER') {
         const { studentName, teamId, previousName } = msg;
         if (!studentName || typeof studentName !== 'string') return;
         const clean = studentName.trim();
         if (clean.length < 2) return;
-        const prevClean = previousName ? previousName.trim() : null;
+        const cleanLower = clean.toLowerCase();
+        const prevCleanLower = previousName ? previousName.trim().toLowerCase() : null;
 
         setTeams((prevTeams) => {
           return prevTeams.map((team) => {
             let members = sanitizeMembers(team.members);
-            if (prevClean && prevClean !== clean) {
-              members = members.filter((m) => (typeof m === 'string' ? m : m.name) !== prevClean);
+            if (prevCleanLower && prevCleanLower !== cleanLower) {
+              members = members.filter((m) => {
+                const n = typeof m === 'string' ? m : m.name;
+                return n.trim().toLowerCase() !== prevCleanLower;
+              });
             }
+            members = members.filter((m) => {
+              const n = typeof m === 'string' ? m : m.name;
+              return n.trim().toLowerCase() !== cleanLower;
+            });
             if (team.id === teamId) {
-              members = members.filter((m) => (typeof m === 'string' ? m : m.name) !== clean);
               if (members.length < 8) members.push(clean);
-            } else {
-              members = members.filter((m) => (typeof m === 'string' ? m : m.name) !== clean);
             }
             return { ...team, members };
           });
@@ -271,16 +294,17 @@ const sanitizeMembers = (membersList) => {
       if (msg.type === 'REMOVE_MEMBER') {
         const { studentName, teamId } = msg;
         if (!studentName) return;
-        const clean = studentName.trim();
+        const cleanLower = studentName.trim().toLowerCase();
 
         setTeams((prevTeams) => {
           return prevTeams.map((team) => {
             if (team.id !== teamId) return team;
             return {
               ...team,
-              members: sanitizeMembers(team.members).filter(
-                (m) => (typeof m === 'string' ? m : m.name) !== clean
-              )
+              members: sanitizeMembers(team.members).filter((m) => {
+                const n = typeof m === 'string' ? m : m.name;
+                return n.trim().toLowerCase() !== cleanLower;
+              })
             };
           });
         });
