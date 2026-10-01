@@ -243,6 +243,10 @@ export default function App() {
             <SabotagePanel
               sabotageCards={{ P1: activeTeam?.sabotages || [] }}
               activeTeam={activeTeam}
+              studentName={studentName}
+              isAdmin={isAdmin}
+              isGameStarted={isGameStarted}
+              isGamePaused={isGamePaused}
               isAnswered={isAnswered}
               onUseSabotage={useSabotageCard}
             />
@@ -316,6 +320,10 @@ export default function App() {
               <SabotagePanel
                 sabotageCards={{ P1: activeTeam?.sabotages || [] }}
                 activeTeam={activeTeam}
+                studentName={studentName}
+                isAdmin={isAdmin}
+                isGameStarted={isGameStarted}
+                isGamePaused={isGamePaused}
                 isAnswered={isAnswered}
                 onUseSabotage={useSabotageCard}
               />

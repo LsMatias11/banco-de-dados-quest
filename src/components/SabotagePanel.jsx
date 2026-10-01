@@ -32,10 +32,27 @@ const CARD_THEMES = {
 
 export default function SabotagePanel({
   activeTeam,
-  isAnswered,
+  studentName,
+  isAdmin,
+  isGameStarted = true,
+  isGamePaused = false,
+  isAnswered = false,
   onUseSabotage
 }) {
   const currentCredits = activeTeam?.credits || 1000;
+
+  // Verifica se o aluno logado pertence à equipe que está no turno ativo
+  const cleanStudent = (studentName || '').trim().toLowerCase();
+  const isMemberOfActiveTeam = Boolean(
+    cleanStudent &&
+    activeTeam?.members?.some((m) => {
+      const mName = typeof m === 'string' ? m : m?.name;
+      return mName?.trim().toLowerCase() === cleanStudent;
+    })
+  );
+
+  const isMyTeamTurn = isMemberOfActiveTeam || isAdmin;
+  const canSabotage = isMyTeamTurn && isGameStarted && !isGamePaused && !isAnswered;
 
   return (
     <section className="h-full flex flex-col gap-4" data-purpose="tactical-combat-panel">
@@ -62,6 +79,24 @@ export default function SabotagePanel({
             </div>
           </div>
 
+          {/* Turno da Equipe Status Banner */}
+          <div className="mb-2.5 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-2 shadow-inner">
+            {isMyTeamTurn ? (
+              <span className="font-mono text-[10px] text-emerald-400 font-bold uppercase flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                SUA VEZ DE JOGAR ({activeTeam?.name?.toUpperCase()})
+              </span>
+            ) : (
+              <span className="font-mono text-[10px] text-amber-400 font-bold uppercase flex items-center gap-1.5">
+                <Lock className="w-3 h-3 text-amber-400" />
+                AGUARDANDO A {activeTeam?.name?.toUpperCase()}
+              </span>
+            )}
+            <span className="text-[9px] font-mono text-slate-400 uppercase">
+              {isMyTeamTurn ? 'SABOTAGEM LIBERADA' : 'BLOQUEADO'}
+            </span>
+          </div>
+
           {/* Cards List com Preço em Créditos */}
           <div className="space-y-2.5">
             {SABOTAGE_CARDS.map((card) => {
@@ -74,7 +109,7 @@ export default function SabotagePanel({
                 <div
                   key={card.id}
                   className={`p-3 rounded-2xl border-2 transition group ${
-                    canAfford
+                    canAfford && canSabotage
                       ? `${theme.border}`
                       : 'bg-arcade-darkest/40 border-white/5 opacity-50 cursor-not-allowed'
                   }`}
@@ -82,7 +117,7 @@ export default function SabotagePanel({
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm mt-0.5 group-hover:scale-110 transition ${
-                        canAfford ? theme.iconBg : 'bg-slate-900 text-slate-600'
+                        canAfford && canSabotage ? theme.iconBg : 'bg-slate-900 text-slate-600'
                       }`}>
                         <CardIcon className="w-5 h-5" />
                       </div>
@@ -102,16 +137,26 @@ export default function SabotagePanel({
                     </div>
 
                     <button
-                      disabled={!canAfford || isAnswered}
-                      onClick={() => onUseSabotage(card.id)}
+                      disabled={!canAfford || !canSabotage}
+                      onClick={() => canSabotage && canAfford && onUseSabotage(card.id, studentName)}
                       className={`px-3 py-1.5 rounded-xl font-display font-black text-[10px] uppercase tracking-wider active:scale-95 transition shrink-0 ${
-                        canAfford
+                        canAfford && canSabotage
                           ? theme.btn
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700 opacity-60'
                       }`}
-                      title={canAfford ? `Comprar por ${cost} PTS` : `Precisa de ${cost} PTS`}
+                      title={
+                        !isMyTeamTurn
+                          ? `Apenas a equipe que está no turno (${activeTeam?.name}) pode lançar sabotagens!`
+                          : !canAfford
+                          ? `Precisa de ${cost} PTS`
+                          : `Comprar por ${cost} PTS`
+                      }
                     >
-                      {canAfford ? `LANÇAR (-${cost} PTS)` : `${cost} PTS`}
+                      {!isMyTeamTurn
+                        ? 'TURNO ADVERSÁRIO'
+                        : canAfford
+                        ? `LANÇAR (-${cost} PTS)`
+                        : `${cost} PTS`}
                     </button>
                   </div>
                 </div>

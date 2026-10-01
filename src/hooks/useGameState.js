@@ -136,8 +136,9 @@ export function useGameState() {
 
   // Modais e Alertas
   const [sabotageAlert, setSabotageAlert] = useState(null);
-  const closeSabotageAlert = () => setSabotageAlert(null);
+  const closeSabotageAlert = useCallback(() => setSabotageAlert(null), []);
   const [rollbackAlert, setRollbackAlert] = useState(null);
+  const closeRollbackAlert = useCallback(() => setRollbackAlert(null), []);
   const [winner, setWinner] = useState(savedState?.winner || null);
   const [showExplanationModal, setShowExplanationModal] = useState(false);
   const [showLobbyModal, setShowLobbyModal] = useState(false);
@@ -859,8 +860,6 @@ const sanitizeMembers = (membersList) => {
     );
   };
 
-  const closeRollbackAlert = () => setRollbackAlert(null);
-
   // Confirmar Resposta da Equipe (Acerto = +150 PTS e avanço)
   const handleAnswer = (optionIndex, answeringUser = null) => {
     if (!isGameStarted || isGamePaused || isAnswered || winner) return;
@@ -939,8 +938,18 @@ const sanitizeMembers = (membersList) => {
   };
 
   // Ativar Carta de Sabotagem (Dedução de Créditos PTS e Notificação Visual Sincronizada)
-  const useSabotageCard = (cardId) => {
-    if (isAnswered) return;
+  const useSabotageCard = (cardId, invokingUser = null) => {
+    if (!isGameStarted || isGamePaused || isAnswered || winner) return;
+
+    // Somente o time que está no turno (ou o ADM) pode lançar sabotagens
+    if (invokingUser && !isAdmin) {
+      const clean = invokingUser.trim().toLowerCase();
+      const isMember = activeTeam?.members?.some((m) => {
+        const mName = typeof m === 'string' ? m : m?.name;
+        return mName?.trim().toLowerCase() === clean;
+      });
+      if (!isMember) return;
+    }
 
     const card = SABOTAGE_CARDS.find((c) => c.id === cardId);
     const cost = card ? card.cost : 400;

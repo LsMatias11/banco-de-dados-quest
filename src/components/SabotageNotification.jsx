@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Skull, ShieldAlert, Zap, X, Clock, Cpu, Lock } from 'lucide-react';
 
 export default function SabotageNotification({
@@ -10,6 +10,8 @@ export default function SabotageNotification({
   if (!alert) return null;
 
   const [progress, setProgress] = useState(100);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Determinar qual é a equipe do aluno atual
   const cleanStudent = (studentName || '').trim().toLowerCase();
@@ -25,23 +27,29 @@ export default function SabotageNotification({
   const isAttacker = currentTeam?.id === alert.sourceTeamId;
   const isVictim = currentTeam?.id === alert.targetTeamId;
 
-  // Auto-fechar após 5 segundos com barra de progresso suave
+  // Identificador estável do alerta atual para não reiniciar o timer a cada render
+  const alertKey = alert.timestamp || alert.cardId || 'sabotage';
+
+  // Auto-fechar após 5 segundos com barra de progresso suave contínua
   useEffect(() => {
     const startTime = Date.now();
     const duration = 5000;
+    setProgress(100);
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
       setProgress(remaining);
-      if (remaining <= 0) {
+      if (elapsed >= duration) {
         clearInterval(interval);
-        onClose();
+        if (onCloseRef.current) {
+          onCloseRef.current();
+        }
       }
     }, 50);
 
     return () => clearInterval(interval);
-  }, [alert, onClose]);
+  }, [alertKey]);
 
   // Ícone específico da carta
   const getCardIcon = (cardId) => {
