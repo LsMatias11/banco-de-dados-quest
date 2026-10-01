@@ -1,12 +1,16 @@
-// Service de Sincronização Multiplayer em Tempo Real (PubNub Streaming + History Engine v8)
-// Inclui proteção contra cache agressivo do Microsoft Edge, Safari e Chrome Mobile
+// Service de Sincronização Multiplayer em Tempo Real (PubNub Streaming + BroadcastChannel v10)
+// Inclui proteção contra loops de histórico, self-echo e compatibilidade total com Edge/Chrome/Mobile
+
+export const CLIENT_ID = typeof window !== 'undefined'
+  ? `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  : 'server_client';
 
 /**
  * Converte o código da sala em um nome de canal seguro para a rede PubNub
  */
 export const getChannelName = (roomCode) => {
   const clean = (roomCode || 'BD-MAIN').toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `bd_quest_${clean}_v8`;
+  return `bd_quest_${clean}_v10`;
 };
 
 /**
@@ -38,11 +42,24 @@ export const publishRoomState = async (roomCode, message) => {
   const channel = getChannelName(roomCode);
   const payload = {
     ...message,
+    senderId: CLIENT_ID,
     msgId: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     lastUpdated: Date.now(),
     timestamp: Date.now()
   };
 
+  // 1. Broadcast instantâneo local (comunicação 0ms entre abas do mesmo navegador Chrome <-> Chrome ou Edge <-> Edge)
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(`bc_${channel}`);
+      bc.postMessage(payload);
+      bc.close();
+    }
+  } catch (e) {
+    // Ignora restrições locais de sandbox
+  }
+
+  // 2. Publicação na rede global PubNub (comunicação entre navegadores diferentes Chrome <-> Edge e Celular)
   try {
     const res = await fetch(`https://ps.pubnub.com/publish/demo/demo/0/${channel}/0?_t=${Date.now()}_${Math.random()}`, {
       method: 'POST',
@@ -58,60 +75,75 @@ export const publishRoomState = async (roomCode, message) => {
 };
 
 /**
- * Inscreve um cliente para receber eventos e atualizações instantâneas da sala
- * - Desativa cache agressivo em navegadores Chromium/Edge/WebKit
- * - Carrega o histórico recente para recuperar membros já conectados
- * - Mantém uma conexão de streaming contínuo (long-polling do PubNub) para latência < 100ms
- * - Inclui polling de segurança rápido a cada 1.5s com anti-cache para 100% de estabilidade no Edge
+ * Inscreve um cliente para receber eventos em tempo real da sala
+ * - Conecta via BroadcastChannel local (0ms)
+ * - Conecta via streaming de PubNub (apenas eventos futuros a partir do momento da conexão)
+ * - NUNCA faz polling de histórico repetitivo (elimina 100% o bug de tela piscando / ações repetidas)
+ * - Filtra self-echo (mensagens enviadas por esta mesma aba são descartadas)
  */
 export const subscribeToRoom = (roomCode, onMessage) => {
   if (!roomCode) return () => {};
   const channel = getChannelName(roomCode);
 
   let isSubscribed = true;
-  let currentTimetoken = '0';
+  let currentTimetoken = String(Date.now() * 10000);
   let abortController = null;
-  const seenTimestamps = new Set();
+  const seenMsgIds = new Set();
 
-  const handleMessage = (msg) => {
+  const handleIncomingMessage = (msg) => {
     if (!msg || typeof msg !== 'object') return;
-    // Evita duplicar mensagens idênticas processadas em rajada
-    const dedupeKey = msg.msgId || (msg.timestamp ? `${msg.type || 'msg'}_${msg.timestamp}_${msg.studentName || ''}` : null);
-    if (dedupeKey && seenTimestamps.has(dedupeKey)) return;
-    if (dedupeKey) {
-      seenTimestamps.add(dedupeKey);
-      if (seenTimestamps.size > 300) {
-        const first = seenTimestamps.values().next().value;
-        seenTimestamps.delete(first);
+    
+    // 1. Evita self-echo: descarta mensagens que foram enviadas por esta mesma aba
+    if (msg.senderId && msg.senderId === CLIENT_ID) return;
+
+    // 2. Deduplicação por msgId exclusivo
+    if (msg.msgId) {
+      if (seenMsgIds.has(msg.msgId)) return;
+      seenMsgIds.add(msg.msgId);
+      if (seenMsgIds.size > 200) {
+        const first = seenMsgIds.values().next().value;
+        seenMsgIds.delete(first);
       }
     }
+
     onMessage(msg);
   };
 
-  // 1. Carrega histórico recente para recuperar o estado e membros já conectados (anti-cache)
-  const loadHistory = async () => {
+  // 1. Ouvinte local de BroadcastChannel (comunicação instantânea na mesma máquina)
+  let localBc = null;
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      localBc = new BroadcastChannel(`bc_${channel}`);
+      localBc.onmessage = (event) => {
+        if (!isSubscribed) return;
+        handleIncomingMessage(event.data);
+      };
+    }
+  } catch (e) {}
+
+  // 2. Obter timetoken inicial da PubNub para ouvir estritamente eventos a partir de AGORA
+  const initTimetokenAndStartStream = async () => {
     try {
-      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=30&_t=${Date.now()}_${Math.random()}`, {
+      const timeRes = await fetch(`https://ps.pubnub.com/time/0?_t=${Date.now()}`, {
         headers: NO_CACHE_HEADERS,
         cache: 'no-store'
       });
-      if (res.ok && isSubscribed) {
-        const data = await res.json();
-        if (Array.isArray(data) && Array.isArray(data[0])) {
-          data[0].forEach((msg) => {
-            handleMessage(msg);
-          });
-          if (data[2]) {
-            currentTimetoken = String(data[2]);
-          }
+      if (timeRes.ok) {
+        const timeData = await timeRes.json();
+        if (Array.isArray(timeData) && timeData[0]) {
+          currentTimetoken = String(timeData[0]);
         }
       }
     } catch (e) {
-      // Ignora oscilações na leitura inicial
+      currentTimetoken = String(Date.now() * 10000);
+    }
+
+    if (isSubscribed) {
+      pollStream();
     }
   };
 
-  // 2. Loop de Streaming em tempo real com timeout de segurança de 12s para o Edge não travar
+  // 3. Loop de Streaming em tempo real (long-polling HTTP nativo da PubNub)
   const pollStream = async () => {
     while (isSubscribed) {
       let timeoutId = null;
@@ -121,9 +153,9 @@ export const subscribeToRoom = (roomCode, onMessage) => {
           try {
             abortController.abort();
           } catch (e) {}
-        }, 12000);
+        }, 15000);
 
-        const url = `https://ps.pubnub.com/subscribe/demo/${channel}/0/${currentTimetoken || '0'}?_t=${Date.now()}`;
+        const url = `https://ps.pubnub.com/subscribe/demo/${channel}/0/${currentTimetoken}?_t=${Date.now()}`;
         const res = await fetch(url, {
           signal: abortController.signal,
           headers: NO_CACHE_HEADERS,
@@ -135,7 +167,7 @@ export const subscribeToRoom = (roomCode, onMessage) => {
           const data = await res.json();
           if (Array.isArray(data) && Array.isArray(data[0])) {
             data[0].forEach((msg) => {
-              handleMessage(msg);
+              handleIncomingMessage(msg);
             });
             if (data[1]) {
               currentTimetoken = String(data[1]);
@@ -152,39 +184,15 @@ export const subscribeToRoom = (roomCode, onMessage) => {
     }
   };
 
-  // 3. Polling de redundância rápido a cada 1.2s com anti-cache (crucial para o Edge não congelar)
-  const redundancyInterval = setInterval(async () => {
-    if (!isSubscribed) return;
-    try {
-      const res = await fetch(`https://ps.pubnub.com/v2/history/sub-key/demo/channel/${channel}?count=10&_t=${Date.now()}_${Math.random()}`, {
-        headers: NO_CACHE_HEADERS,
-        cache: 'no-store'
-      });
-      if (res.ok && isSubscribed) {
-        const data = await res.json();
-        if (Array.isArray(data) && Array.isArray(data[0])) {
-          data[0].forEach((msg) => {
-            handleMessage(msg);
-          });
-          if (data[2]) {
-            currentTimetoken = String(data[2]);
-          }
-        }
-      }
-    } catch (e) {
-      // tolerância silenciosa
-    }
-  }, 1200);
-
-  loadHistory().then(() => {
-    if (isSubscribed) {
-      pollStream();
-    }
-  });
+  initTimetokenAndStartStream();
 
   return () => {
     isSubscribed = false;
-    clearInterval(redundancyInterval);
+    if (localBc) {
+      try {
+        localBc.close();
+      } catch (e) {}
+    }
     if (abortController) {
       try {
         abortController.abort();

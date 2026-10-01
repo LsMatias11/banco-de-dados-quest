@@ -205,6 +205,7 @@ const sanitizeMembers = (membersList) => {
 
   // Refs de sincronização e estado estável para evitar loops de render
   const stateRef = useRef();
+  const lastSyncTimestampRef = useRef(0);
   stateRef.current = {
     isAdmin,
     isGameStarted,
@@ -228,6 +229,14 @@ const sanitizeMembers = (membersList) => {
 
     const unsubscribe = subscribeToRoom(roomCode, (msg) => {
       if (!msg || typeof msg !== 'object') return;
+
+      // Proteção de integridade temporal: descarta mensagens atrasadas ou fora de ordem
+      if (msg.timestamp) {
+        if (lastSyncTimestampRef.current && msg.timestamp < lastSyncTimestampRef.current) {
+          return;
+        }
+        lastSyncTimestampRef.current = msg.timestamp;
+      }
 
       // 1. AÇÃO: Entrada / Troca de Equipe de um Aluno
       if (msg.type === 'JOIN_MEMBER') {
@@ -385,7 +394,7 @@ const sanitizeMembers = (membersList) => {
       // 9. AÇÃO: Requisição de Estado para Novos Clientes (ex: Edge conectando)
       if (msg.type === 'REQUEST_SYNC') {
         const cur = stateRef.current;
-        if (cur && (cur.isAdmin || cur.isGameStarted)) {
+        if (cur && (cur.isAdmin || (!cur.isAdmin && cur.isGameStarted))) {
           publishRoomState(roomCode, {
             type: 'SYNC_STATE',
             viewMode: cur.viewMode,
@@ -412,7 +421,11 @@ const sanitizeMembers = (membersList) => {
       if (remoteState.teams && Array.isArray(remoteState.teams)) {
         setTeams((prevTeams) => mergeTeamData(remoteState.teams, prevTeams));
       }
-      if (remoteState.activeTeamId) setActiveTeamId(remoteState.activeTeamId);
+      // activeTeamId só sincroniza durante a partida iniciada (turno atual da rodada).
+      // No Lobby, NUNCA sobrescreve a escolha da equipe do aluno local!
+      if (remoteState.isGameStarted && remoteState.activeTeamId) {
+        setActiveTeamId(remoteState.activeTeamId);
+      }
       if (remoteState.turnIndex !== undefined) setTurnIndex(remoteState.turnIndex);
       if (remoteState.isGameStarted !== undefined) setIsGameStarted(remoteState.isGameStarted);
       if (remoteState.isGamePaused !== undefined) setIsGamePaused(remoteState.isGamePaused);

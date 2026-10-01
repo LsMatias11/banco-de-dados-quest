@@ -107,6 +107,7 @@ export default function TeamLobbyScreen({
 
   // Função central para entrar / associar-se a uma equipe
   const handleJoinTeam = (teamId) => {
+    setActiveTeamId(teamId);
     const cleanName = nameInput.trim();
     if (!cleanName || cleanName.length < 2) {
       setFeedbackMsg('⚠️ Digite seu nome / alias acima (mínimo 2 letras) para entrar na equipe!');
@@ -114,7 +115,6 @@ export default function TeamLobbyScreen({
       return;
     }
 
-    setActiveTeamId(teamId);
     if (setStudentName) setStudentName(cleanName);
 
     if (joinTeamMember) {
