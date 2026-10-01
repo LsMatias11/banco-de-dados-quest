@@ -394,7 +394,7 @@ const sanitizeMembers = (membersList) => {
         if (msg.timerExpiresAt) {
           setTimerExpiresAt(msg.timerExpiresAt);
           setTimer(Math.max(0, Math.ceil((msg.timerExpiresAt - Date.now()) / 1000)));
-        } else if (msg.timer !== undefined) {
+        } else if (typeof msg.timer === 'number' && msg.timer > 0) {
           setTimer(msg.timer);
         }
         return;
@@ -403,8 +403,7 @@ const sanitizeMembers = (membersList) => {
       // 9. AÇÃO: Requisição de Estado para Novos Clientes (ex: Edge conectando)
       if (msg.type === 'REQUEST_SYNC') {
         const cur = stateRef.current;
-        const hasMembers = cur && cur.teams && cur.teams.some((t) => t.members && t.members.length > 0);
-        if (cur && (cur.isAdmin || cur.isGameStarted || hasMembers)) {
+        if (cur && (cur.isAdmin || cur.isGameStarted)) {
           publishRoomState(roomCode, {
             type: 'SYNC_STATE',
             viewMode: cur.viewMode,
@@ -428,14 +427,22 @@ const sanitizeMembers = (membersList) => {
 
       // 10. SINCRONIZAÇÃO COMPLETA DE ESTADO
       const remoteState = msg.state || msg;
-      if (remoteState.viewMode) setViewMode(remoteState.viewMode);
+      if (remoteState.viewMode) {
+        if (remoteState.viewMode === 'LOBBY' && isGameStarted && remoteState.isGameStarted !== false) {
+          // Não reverte partida em andamento para LOBBY
+        } else {
+          setViewMode(remoteState.viewMode);
+        }
+      }
       if (remoteState.teams && Array.isArray(remoteState.teams)) {
         setTeams((prevTeams) => mergeTeamData(remoteState.teams, prevTeams));
       }
-      // activeTeamId só sincroniza durante a partida iniciada (turno atual da rodada).
+      // activeTeamId sincroniza durante a partida iniciada (turno atual da rodada).
       // No Lobby, NUNCA sobrescreve a escolha da equipe do aluno local!
-      if (remoteState.isGameStarted && remoteState.activeTeamId) {
-        setActiveTeamId(remoteState.activeTeamId);
+      if (remoteState.activeTeamId) {
+        if (remoteState.isGameStarted || isGameStarted || remoteState.viewMode === 'GAME' || viewMode === 'GAME') {
+          setActiveTeamId(remoteState.activeTeamId);
+        }
       }
       if (remoteState.turnIndex !== undefined) setTurnIndex(remoteState.turnIndex);
       if (remoteState.isGameStarted !== undefined) setIsGameStarted(remoteState.isGameStarted);
@@ -698,6 +705,8 @@ const sanitizeMembers = (membersList) => {
     if (isOnlineRoom && roomCode) {
       publishRoomState(roomCode, {
         type: 'SYNC_STATE',
+        isGameStarted: true,
+        viewMode: 'GAME',
         turnIndex: nextTurnIdx,
         currentQuestionIdx: nextQIdx,
         activeTeamId: nextTeamId,
@@ -1077,8 +1086,8 @@ const sanitizeMembers = (membersList) => {
         type: 'SABOTAGE_TRIGGERED',
         ...alertData,
         eliminatedOptions: newEliminated,
-        timer: newRemaining,
-        timerExpiresAt: newExpires
+        ...(newRemaining !== null ? { timer: newRemaining } : {}),
+        ...(newExpires !== null ? { timerExpiresAt: newExpires } : {})
       });
     }
   };

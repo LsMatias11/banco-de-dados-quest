@@ -5,6 +5,8 @@ import OnlineRoomModal from './OnlineRoomModal';
 
 export default function Header({
   activeTeam,
+  teams = [],
+  studentName = '',
   teamsCount,
   turnIndex,
   onOpenLobby,
@@ -36,6 +38,15 @@ export default function Header({
   const fileInputRef = useRef(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
+
+  const cleanStudent = (studentName || '').toLowerCase().trim();
+  const myTeam = (teams || []).find(t =>
+    (t.members || []).some(m => {
+      const name = typeof m === 'string' ? m : m?.name;
+      return name && cleanStudent && name.toLowerCase().trim() === cleanStudent;
+    })
+  );
+  const isMyTeamTurn = myTeam && activeTeam && myTeam.id === activeTeam.id;
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -105,9 +116,22 @@ export default function Header({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-black text-white tracking-wide font-display">
-                {activeTeam?.name || 'Equipe Alfa'} <span className="text-[10px] font-sans font-medium text-emerald-400">(Seu Time)</span>
+                {activeTeam?.name || 'Equipe Alfa'}{' '}
+                {isMyTeamTurn ? (
+                  <span className="text-[10px] font-sans font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-sm">
+                    (Seu Turno!)
+                  </span>
+                ) : myTeam ? (
+                  <span className="text-[10px] font-sans font-medium text-cyan-300 bg-cyan-950/50 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+                    (Turno da Vez • Seu time: {myTeam.name})
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-sans font-medium text-slate-400">
+                    (Turno da Vez)
+                  </span>
+                )}
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <span className={`w-1.5 h-1.5 rounded-full ${isMyTeamTurn ? 'bg-emerald-400 animate-ping' : 'bg-cyan-400'}`}></span>
             </div>
             {/* Members Chips */}
             <div className="flex items-center gap-1 mt-0.5 flex-wrap">

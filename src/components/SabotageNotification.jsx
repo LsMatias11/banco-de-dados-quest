@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Skull, ShieldAlert, Zap, X, Clock, Cpu, Lock } from 'lucide-react';
+import { Skull, ShieldAlert, Zap, X, Clock, Cpu, Lock, Sparkles } from 'lucide-react';
 
 export default function SabotageNotification({
   alert,

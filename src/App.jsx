@@ -137,6 +137,8 @@ export default function App() {
       {/* Top Header */}
       <Header
         activeTeam={activeTeam}
+        teams={teams}
+        studentName={studentName}
         teamsCount={teams?.length || 4}
         turnIndex={turnIndex}
         onOpenLobby={() => setViewMode('LOBBY')}
