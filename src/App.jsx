@@ -358,10 +358,9 @@ export default function App() {
       />
 
       <VictoryModal
-        winner={winner ? 'P1' : null}
+        winner={winner}
+        teams={teams}
         onReset={resetGame}
-        studentData={{ p1Name: winner?.name, p1Mat: winner?.roverName }}
-        bingoGrid={{ P1: winner?.bingoGrid || [] }}
       />
 
       <ExplanationModal
