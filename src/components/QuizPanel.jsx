@@ -262,7 +262,7 @@ export default function QuizPanel({
               return (
                 <label
                   key={idx}
-                  onClick={() => canInteract && onAnswer(idx)}
+                  onClick={() => canInteract && onAnswer(idx, studentName)}
                   className={`group relative flex items-start gap-3 p-3 sm:p-3.5 rounded-2xl border transition cursor-pointer shadow-md ${cardStyle}`}
                 >
                   <input className="sr-only" name="tuplas_question" type="radio" checked={isSelected} readOnly />
@@ -286,30 +286,41 @@ export default function QuizPanel({
             })}
           </div>
 
-          {/* Result Feedback Banner */}
+          {/* Result Feedback Banner com Quem Respondeu */}
           {isAnswered && (
-            <div className={`mt-3 p-3 rounded-xl border flex items-center gap-3 animate-fade-in ${
+            <div className={`mt-3 p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in ${
               selectedOption === currentQuestion.correctIndex
-                ? 'bg-emerald-950/80 border-emerald-400 text-emerald-200'
-                : 'bg-red-950/80 border-red-500 text-red-200'
+                ? 'bg-emerald-950/85 border-emerald-400 text-emerald-200 shadow-glow-emerald/20'
+                : 'bg-red-950/85 border-red-500 text-red-200 shadow-glow-red/20'
             }`}>
-              {selectedOption === currentQuestion.correctIndex ? (
-                <>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <div className="text-xs">
-                    <strong className="font-bold text-white uppercase block">🎉 RESPOSTA CORRETA!</strong>
-                    <span>A <strong>{currentPlayer || 'Equipe'}</strong> acertou a questão e avançou no Overworld!</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-5 h-5 text-red-400 shrink-0" />
-                  <div className="text-xs">
-                    <strong className="font-bold text-white uppercase block">❌ RESPOSTA INCORRETA!</strong>
-                    <span>A <strong>{currentPlayer || 'Equipe'}</strong> errou. A opção correta era: <strong className="text-emerald-300 font-mono font-bold font-black">{optionLetters[currentQuestion.correctIndex]}</strong>.</span>
-                  </div>
-                </>
-              )}
+              <div className="flex items-start sm:items-center gap-3">
+                {selectedOption === currentQuestion.correctIndex ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5 sm:mt-0" />
+                )}
+                <div className="text-xs">
+                  <strong className="font-bold text-white uppercase block">
+                    {selectedOption === currentQuestion.correctIndex ? '🎉 RESPOSTA CORRETA!' : '❌ RESPOSTA INCORRETA!'}
+                  </strong>
+                  <span>
+                    {selectedOption === currentQuestion.correctIndex
+                      ? `A equipe ${answerResult?.teamName || currentPlayer || 'ativa'} acertou a questão e avançou no Overworld!`
+                      : `A equipe ${answerResult?.teamName || currentPlayer || 'ativa'} errou. A opção correta era: `}
+                    {selectedOption !== currentQuestion.correctIndex && (
+                      <strong className="text-emerald-300 font-mono font-bold">{optionLetters[currentQuestion.correctIndex]}</strong>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Tag visual de quem respondeu a pergunta */}
+              <div className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-slate-950/90 border border-cyan-400/30 text-slate-300 flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-inner">
+                <span className="text-cyan-400 font-bold">👤 Respondido por:</span>
+                <span className="text-white font-bold tracking-wide">
+                  {answerResult?.answeredBy || (studentName ? studentName.trim() : (currentPlayer || 'Jogador'))}
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -332,13 +343,20 @@ export default function QuizPanel({
           )}
 
           {isAnswered ? (
-            <button
-              onClick={onNextTurn}
-              className="relative group px-6 py-2.5 rounded-2xl font-display text-xs font-black tracking-wider uppercase text-slate-950 bg-gradient-to-r from-arcade-emerald via-arcade-cyan to-teal-300 hover:from-teal-300 hover:to-arcade-emerald shadow-glow-cyan transition-all transform active:scale-95 flex items-center gap-2.5 border border-white/40 cursor-pointer"
-            >
-              <span>Próximo Turno</span>
-              <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition" />
-            </button>
+            isAdmin ? (
+              <button
+                onClick={onNextTurn}
+                className="relative group px-6 py-2.5 rounded-2xl font-display text-xs font-black tracking-wider uppercase text-slate-950 bg-gradient-to-r from-arcade-emerald via-arcade-cyan to-teal-300 hover:from-teal-300 hover:to-arcade-emerald shadow-glow-cyan transition-all transform active:scale-95 flex items-center gap-2.5 border border-white/40 cursor-pointer"
+              >
+                <span>Próximo Turno</span>
+                <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition" />
+              </button>
+            ) : (
+              <div className="px-4 py-2 rounded-xl bg-slate-950/90 border border-cyan-500/40 text-cyan-300 font-mono text-[11px] flex items-center gap-2 shadow-inner">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                <span>Aguardando o ADM passar para a próxima pergunta...</span>
+              </div>
+            )
           ) : !isGameStarted ? (
             <button
               onClick={onStartGame}
@@ -350,7 +368,7 @@ export default function QuizPanel({
           ) : (
             <button
               disabled={selectedOption === null || isGamePaused || !canTeamAnswer}
-              onClick={() => selectedOption !== null && canTeamAnswer && onAnswer(selectedOption)}
+              onClick={() => selectedOption !== null && canTeamAnswer && onAnswer(selectedOption, studentName)}
               className={`relative group px-6 py-2.5 rounded-2xl font-display text-xs font-black tracking-wider uppercase text-slate-950 transition-all transform flex items-center gap-2.5 border border-white/40 ${
                 selectedOption !== null && !isGamePaused && canTeamAnswer
                   ? 'bg-gradient-to-r from-arcade-emerald via-arcade-cyan to-teal-300 hover:from-teal-300 hover:to-arcade-emerald shadow-glow-cyan cursor-pointer active:scale-95'

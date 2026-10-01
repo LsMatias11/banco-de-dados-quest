@@ -203,7 +203,26 @@ const sanitizeMembers = (membersList) => {
     });
   };
 
-  // Assinar atualizações remotas da sala online em tempo real
+  // Refs de sincronização e estado estável para evitar loops de render
+  const stateRef = useRef();
+  stateRef.current = {
+    isAdmin,
+    isGameStarted,
+    isGamePaused,
+    viewMode,
+    teams,
+    activeTeamId,
+    turnIndex,
+    currentQuestionIdx,
+    selectedOption,
+    isAnswered,
+    answerResult,
+    winner,
+    timer,
+    timerExpiresAt
+  };
+
+  // Assinar atualizações remotas da sala online em tempo real (apenas quando roomCode ou isOnlineRoom mudam!)
   useEffect(() => {
     if (!isOnlineRoom || !roomCode) return;
 
@@ -365,22 +384,23 @@ const sanitizeMembers = (membersList) => {
 
       // 9. AÇÃO: Requisição de Estado para Novos Clientes (ex: Edge conectando)
       if (msg.type === 'REQUEST_SYNC') {
-        if (isAdmin || isGameStarted) {
+        const cur = stateRef.current;
+        if (cur && (cur.isAdmin || cur.isGameStarted)) {
           publishRoomState(roomCode, {
             type: 'SYNC_STATE',
-            viewMode,
-            teams: teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
-            activeTeamId,
-            turnIndex,
-            isGameStarted,
-            isGamePaused,
-            currentQuestionIdx,
-            selectedOption,
-            isAnswered,
-            answerResult,
-            winner,
-            timer,
-            timerExpiresAt
+            viewMode: cur.viewMode,
+            teams: cur.teams.map((t) => ({ ...t, members: sanitizeMembers(t.members) })),
+            activeTeamId: cur.activeTeamId,
+            turnIndex: cur.turnIndex,
+            isGameStarted: cur.isGameStarted,
+            isGamePaused: cur.isGamePaused,
+            currentQuestionIdx: cur.currentQuestionIdx,
+            selectedOption: cur.selectedOption,
+            isAnswered: cur.isAnswered,
+            answerResult: cur.answerResult,
+            winner: cur.winner,
+            timer: cur.timer,
+            timerExpiresAt: cur.timerExpiresAt
           });
         }
         return;
@@ -424,7 +444,7 @@ const sanitizeMembers = (membersList) => {
       clearTimeout(syncTimeout);
       unsubscribe();
     };
-  }, [roomCode, isOnlineRoom, isAdmin, isGameStarted, isGamePaused, viewMode, teams, activeTeamId, turnIndex, currentQuestionIdx, selectedOption, isAnswered, answerResult, winner, timer, timerExpiresAt]);
+  }, [roomCode, isOnlineRoom]);
 
   // Função para cadastrar / associar membro a uma equipe (substitui nome antigo se editado)
   const joinTeamMember = useCallback(({ teamId, studentName, previousName }) => {
@@ -610,8 +630,9 @@ const sanitizeMembers = (membersList) => {
     );
   }, []);
 
-  // Próximo Turno da Rodada
+  // Próximo Turno da Rodada (Somente o ADM pode avançar em salas online)
   const nextTurn = useCallback(() => {
+    if (isOnlineRoom && !isAdmin) return;
     setIsAnswered(false);
     setSelectedOption(null);
     setAnswerResult(null);
@@ -654,7 +675,7 @@ const sanitizeMembers = (membersList) => {
         timerExpiresAt: expiresAt
       });
     }
-  }, [teams, activeTeamId, activeSabotages.timeoutActive, isGameStarted, isGamePaused, currentQuestionIdx, turnIndex, isOnlineRoom, roomCode]);
+  }, [teams, activeTeamId, activeSabotages.timeoutActive, isGameStarted, isGamePaused, currentQuestionIdx, turnIndex, isOnlineRoom, roomCode, isAdmin]);
 
   const startGame = () => {
     const expiresAt = Date.now() + 30 * 1000;
@@ -784,10 +805,12 @@ const sanitizeMembers = (membersList) => {
     setTimerActive(false);
     setTimerExpiresAt(null);
     setTimer(0);
-    setIsAnswered(true);
+    const activeTeam = teams.find((t) => t.id === activeTeamId);
     const timeoutResult = {
       isCorrect: false,
-      explanation: 'TEMPO ESGOTADO! A transação da equipe excedeu o timeout.'
+      explanation: 'TEMPO ESGOTADO! A transação da equipe excedeu o timeout.',
+      answeredBy: 'Tempo Esgotado (Sistema)',
+      teamName: activeTeam?.name || 'Equipe'
     };
     setAnswerResult(timeoutResult);
     processError(activeTeamId);
@@ -826,7 +849,7 @@ const sanitizeMembers = (membersList) => {
   const closeRollbackAlert = () => setRollbackAlert(null);
 
   // Confirmar Resposta da Equipe (Acerto = +150 PTS e avanço)
-  const handleAnswer = (optionIndex) => {
+  const handleAnswer = (optionIndex, answeringUser = null) => {
     if (!isGameStarted || isGamePaused || isAnswered || winner) return;
 
     setSelectedOption(optionIndex);
@@ -834,10 +857,17 @@ const sanitizeMembers = (membersList) => {
     setTimerActive(false);
     setTimerExpiresAt(null);
 
+    const currentActiveTeam = teams.find((t) => t.id === activeTeamId);
+    const authorName = (typeof answeringUser === 'string' && answeringUser.trim())
+      ? answeringUser.trim()
+      : (currentActiveTeam?.name || 'Jogador');
+
     const isCorrect = optionIndex === currentQuestion.correctIndex;
     const result = {
       isCorrect,
-      explanation: currentQuestion.explanation
+      explanation: currentQuestion.explanation,
+      answeredBy: authorName,
+      teamName: currentActiveTeam?.name || 'Equipe'
     };
     setAnswerResult(result);
 
