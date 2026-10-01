@@ -49,6 +49,7 @@ export default function App() {
     selectedOption,
     isAnswered,
     answerResult,
+    eliminatedOptions,
     rollbackAlert,
     closeRollbackAlert,
     winner,
@@ -216,6 +217,7 @@ export default function App() {
               selectedOption={selectedOption}
               isAnswered={isAnswered}
               answerResult={answerResult}
+              eliminatedOptions={eliminatedOptions}
               currentPlayer={activeTeam?.name}
               activeTeam={activeTeam}
               studentName={studentName}
@@ -264,6 +266,7 @@ export default function App() {
                 selectedOption={selectedOption}
                 isAnswered={isAnswered}
                 answerResult={answerResult}
+                eliminatedOptions={eliminatedOptions}
                 currentPlayer={activeTeam?.name}
                 activeTeam={activeTeam}
                 studentName={studentName}

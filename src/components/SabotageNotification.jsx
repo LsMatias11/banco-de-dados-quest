@@ -54,15 +54,19 @@ export default function SabotageNotification({
   // Ícone específico da carta
   const getCardIcon = (cardId) => {
     if (cardId === 'TIMEOUT') return <Clock className="w-5 h-5 text-amber-400" />;
-    if (cardId === 'RELATIONAL_OVERLOAD') return <Cpu className="w-5 h-5 text-pink-400" />;
+    if (cardId === 'RELATIONAL_OVERLOAD') return <Sparkles className="w-5 h-5 text-pink-400" />;
     return <Lock className="w-5 h-5 text-cyan-400" />;
   };
+
+  const isHelp = alert.isHelp || alert.cardId === 'RELATIONAL_OVERLOAD';
 
   return (
     <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md pointer-events-auto">
       <div
         className={`rounded-2xl p-4 shadow-2xl border-2 backdrop-blur-xl relative overflow-hidden transition-all transform animate-fade-in ${
-          isVictim
+          isHelp
+            ? 'bg-gradient-to-r from-pink-950 via-slate-900 to-purple-950 border-pink-400 shadow-[0_0_30px_rgba(236,72,153,0.45)] ring-2 ring-pink-400/50'
+            : isVictim
             ? 'bg-gradient-to-r from-red-950 via-slate-900 to-red-950 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.45)] ring-2 ring-red-400/50'
             : isAttacker
             ? 'bg-gradient-to-r from-cyan-950 via-slate-900 to-emerald-950 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.45)] ring-2 ring-cyan-400/50'
@@ -73,14 +77,18 @@ export default function SabotageNotification({
           <div className="flex items-start gap-3">
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                isVictim
+                isHelp
+                  ? 'bg-pink-500/20 border-pink-400 text-pink-300'
+                  : isVictim
                   ? 'bg-red-500/20 border-red-400 text-red-400 animate-pulse'
                   : isAttacker
                   ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
                   : 'bg-purple-500/20 border-purple-400 text-purple-300'
               }`}
             >
-              {isVictim ? (
+              {isHelp ? (
+                <Sparkles className="w-6 h-6 text-pink-400 animate-pulse" />
+              ) : isVictim ? (
                 <ShieldAlert className="w-6 h-6 text-red-400 animate-bounce" />
               ) : isAttacker ? (
                 <Zap className="w-6 h-6 text-cyan-400 animate-pulse" />
@@ -93,14 +101,18 @@ export default function SabotageNotification({
               <div className="flex items-center gap-2">
                 <span
                   className={`font-display text-xs font-black uppercase tracking-wider ${
-                    isVictim
+                    isHelp
+                      ? 'text-pink-300'
+                      : isVictim
                       ? 'text-red-400 animate-pulse'
                       : isAttacker
                       ? 'text-cyan-300'
                       : 'text-purple-300'
                   }`}
                 >
-                  {isVictim
+                  {isHelp
+                    ? '💡 AJUDA RELACIONAL ATIVADA!'
+                    : isVictim
                     ? '⚠️ VOCÊ FOI SABOTADO!'
                     : isAttacker
                     ? '⚔️ SABOTAGEM LANÇADA COM SUCESSO!'
@@ -109,7 +121,19 @@ export default function SabotageNotification({
               </div>
 
               <p className="text-xs text-white leading-relaxed font-sans">
-                {isVictim ? (
+                {isHelp ? (
+                  isAttacker ? (
+                    <>
+                      Sua equipe (<strong className="text-cyan-300 font-bold">{alert.sourceTeamName}</strong>) ativou{' '}
+                      <strong className="text-pink-300 underline font-bold">{alert.cardName}</strong> e eliminou uma alternativa incorreta!
+                    </>
+                  ) : (
+                    <>
+                      A <strong className="text-amber-300 font-bold">{alert.sourceTeamName}</strong> ativou{' '}
+                      <strong className="text-pink-300 underline font-bold">{alert.cardName}</strong> e eliminou uma alternativa incorreta da pergunta!
+                    </>
+                  )
+                ) : isVictim ? (
                   <>
                     A <strong className="text-amber-300 font-bold">{alert.sourceTeamName}</strong> ativou{' '}
                     <strong className="text-red-300 underline font-bold">{alert.cardName}</strong> contra a sua equipe (

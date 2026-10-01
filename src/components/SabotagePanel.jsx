@@ -1,6 +1,6 @@
 import React from 'react';
 import { SABOTAGE_CARDS } from '../data/gameData';
-import { Clock, Cpu, Lock, Zap, ShieldAlert, AlertTriangle, Coins } from 'lucide-react';
+import { Clock, Cpu, Lock, Zap, ShieldAlert, AlertTriangle, Coins, Sparkles } from 'lucide-react';
 import BingoCard from './BingoCard';
 
 const CARD_THEMES = {
@@ -25,8 +25,8 @@ const CARD_THEMES = {
     iconBg: 'bg-pink-500/20 border border-pink-400 text-pink-300',
     badge: 'text-pink-300 bg-pink-950 border-pink-500/50',
     btn: 'bg-gradient-to-r from-arcade-magenta to-pink-500 hover:from-pink-400 hover:to-arcade-magenta text-white border-pink-300 shadow-glow-magenta',
-    tag: 'ROUBO DE CONQUISTA',
-    icon: Cpu
+    tag: 'AJUDA TÁTICA (50/50)',
+    icon: Sparkles
   }
 };
 
@@ -155,7 +155,7 @@ export default function SabotagePanel({
                       {!isMyTeamTurn
                         ? 'TURNO ADVERSÁRIO'
                         : canAfford
-                        ? `LANÇAR (-${cost} PTS)`
+                        ? (card.isHelp ? `USAR AJUDA (-${cost} PTS)` : `LANÇAR (-${cost} PTS)`)
                         : `${cost} PTS`}
                     </button>
                   </div>

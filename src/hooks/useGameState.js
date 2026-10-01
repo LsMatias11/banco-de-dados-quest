@@ -133,6 +133,7 @@ export function useGameState() {
   const [selectedOption, setSelectedOption] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [answerResult, setAnswerResult] = useState(null);
+  const [eliminatedOptions, setEliminatedOptions] = useState([]);
 
   // Modais e Alertas
   const [sabotageAlert, setSabotageAlert] = useState(null);
@@ -221,7 +222,8 @@ const sanitizeMembers = (membersList) => {
     answerResult,
     winner,
     timer,
-    timerExpiresAt
+    timerExpiresAt,
+    eliminatedOptions
   };
 
   // Assinar atualizações remotas da sala online em tempo real (apenas quando roomCode ou isOnlineRoom mudam!)
@@ -333,6 +335,7 @@ const sanitizeMembers = (membersList) => {
         setAnswerResult(null);
         setWinner(null);
         setRollbackAlert(null);
+        setEliminatedOptions([]);
         setViewMode('LOBBY');
         setIsGameStarted(false);
         setIsGamePaused(false);
@@ -358,6 +361,7 @@ const sanitizeMembers = (membersList) => {
         setAnswerResult(null);
         setWinner(null);
         setRollbackAlert(null);
+        setEliminatedOptions([]);
         setIsGameStarted(true);
         setIsGamePaused(false);
         setViewMode('GAME');
@@ -372,8 +376,11 @@ const sanitizeMembers = (membersList) => {
         return;
       }
 
-      // 8. AÇÃO: Sabotagem Acionada em Tempo Real
+      // 8. AÇÃO: Sabotagem / Ajuda Acionada em Tempo Real
       if (msg.type === 'SABOTAGE_TRIGGERED') {
+        if (msg.eliminatedOptions && Array.isArray(msg.eliminatedOptions)) {
+          setEliminatedOptions(msg.eliminatedOptions);
+        }
         setSabotageAlert({
           cardId: msg.cardId,
           cardName: msg.cardName,
@@ -381,6 +388,7 @@ const sanitizeMembers = (membersList) => {
           sourceTeamName: msg.sourceTeamName,
           targetTeamId: msg.targetTeamId,
           targetTeamName: msg.targetTeamName,
+          isHelp: Boolean(msg.isHelp),
           timestamp: Date.now()
         });
         if (msg.timerExpiresAt) {
@@ -411,7 +419,8 @@ const sanitizeMembers = (membersList) => {
             answerResult: cur.answerResult,
             winner: cur.winner,
             timer: cur.timer,
-            timerExpiresAt: cur.timerExpiresAt
+            timerExpiresAt: cur.timerExpiresAt,
+            eliminatedOptions: cur.eliminatedOptions
           });
         }
         return;
@@ -436,6 +445,9 @@ const sanitizeMembers = (membersList) => {
       if (remoteState.isAnswered !== undefined) setIsAnswered(remoteState.isAnswered);
       if (remoteState.answerResult !== undefined) setAnswerResult(remoteState.answerResult);
       if (remoteState.winner !== undefined) setWinner(remoteState.winner);
+      if (remoteState.eliminatedOptions && Array.isArray(remoteState.eliminatedOptions)) {
+        setEliminatedOptions(remoteState.eliminatedOptions);
+      }
       if (remoteState.timerExpiresAt !== undefined) {
         setTimerExpiresAt(remoteState.timerExpiresAt);
         if (remoteState.timerExpiresAt) {
@@ -656,6 +668,7 @@ const sanitizeMembers = (membersList) => {
     setIsAnswered(false);
     setSelectedOption(null);
     setAnswerResult(null);
+    setEliminatedOptions([]);
 
     const nextQIdx = (currentQuestionIdx + 1) % QUESTIONS.length;
     const nextTurnIdx = turnIndex + 1;
@@ -691,6 +704,7 @@ const sanitizeMembers = (membersList) => {
         selectedOption: null,
         isAnswered: false,
         answerResult: null,
+        eliminatedOptions: [],
         timer: newTimer,
         timerExpiresAt: expiresAt
       });
@@ -1013,27 +1027,46 @@ const sanitizeMembers = (membersList) => {
 
     let newExpires = null;
     let newRemaining = null;
+    let newEliminated = eliminatedOptions;
 
     if (cardId === 'TIMEOUT') {
       setActiveSabotages((prev) => ({ ...prev, timeoutActive: true }));
     } else if (cardId === 'PARALLEL_LOCK') {
       // Bloqueio relacional
     } else if (cardId === 'RELATIONAL_OVERLOAD') {
-      const now = Date.now();
-      const currentRemaining = timerExpiresAt ? Math.max(0, Math.ceil((timerExpiresAt - now) / 1000)) : timer;
-      newRemaining = Math.max(5, currentRemaining - 15);
-      newExpires = now + newRemaining * 1000;
-      setTimer(newRemaining);
-      setTimerExpiresAt(newExpires);
+      // Ajuda 50/50: Elimina 1 alternativa incorreta para a equipe
+      const incorrectIndices = currentQuestion.options
+        .map((_, idx) => idx)
+        .filter((idx) => idx !== currentQuestion.correctIndex && !eliminatedOptions.includes(idx));
+
+      if (incorrectIndices.length === 0) {
+        setSabotageAlert({
+          cardId: 'ERROR',
+          cardName: 'Todas as incorretas já foram eliminadas!',
+          sourceTeamId: activeTeam.id,
+          sourceTeamName: activeTeam.name,
+          targetTeamId: null,
+          targetTeamName: null,
+          timestamp: Date.now()
+        });
+        return;
+      }
+
+      const toEliminate = incorrectIndices[Math.floor(Math.random() * incorrectIndices.length)];
+      newEliminated = [...eliminatedOptions, toEliminate];
+      setEliminatedOptions(newEliminated);
     }
 
+    const isHelp = card?.isHelp || cardId === 'RELATIONAL_OVERLOAD';
     const alertData = {
       cardId,
       cardName: card?.name || cardId,
       sourceTeamId: activeTeam.id,
       sourceTeamName: activeTeam.name,
-      targetTeamId: targetTeam.id,
-      targetTeamName: targetTeam.name,
+      targetTeamId: isHelp ? activeTeam.id : targetTeam.id,
+      targetTeamName: isHelp ? activeTeam.name : targetTeam.name,
+      isHelp,
+      eliminatedOptions: newEliminated,
       timestamp: Date.now()
     };
 
@@ -1043,6 +1076,7 @@ const sanitizeMembers = (membersList) => {
       publishRoomState(roomCode, {
         type: 'SABOTAGE_TRIGGERED',
         ...alertData,
+        eliminatedOptions: newEliminated,
         timer: newRemaining,
         timerExpiresAt: newExpires
       });
@@ -1102,6 +1136,7 @@ const sanitizeMembers = (membersList) => {
     setAnswerResult(null);
     setWinner(null);
     setRollbackAlert(null);
+    setEliminatedOptions([]);
     setIsGameStarted(true);
     setIsGamePaused(false);
     setViewMode('GAME');
@@ -1113,6 +1148,7 @@ const sanitizeMembers = (membersList) => {
         activeTeamId: 'alfa',
         turnIndex: 1,
         currentQuestionIdx: 0,
+        eliminatedOptions: [],
         isGameStarted: true,
         isGamePaused: false,
         timer: 30,
@@ -1136,6 +1172,7 @@ const sanitizeMembers = (membersList) => {
     setAnswerResult(null);
     setWinner(null);
     setRollbackAlert(null);
+    setEliminatedOptions([]);
     setViewMode('LOBBY');
     setIsGameStarted(false);
     setIsGamePaused(false);
@@ -1231,6 +1268,7 @@ const sanitizeMembers = (membersList) => {
     selectedOption,
     isAnswered,
     answerResult,
+    eliminatedOptions,
     rollbackAlert,
     closeRollbackAlert,
     winner,

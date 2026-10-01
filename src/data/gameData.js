@@ -278,12 +278,13 @@ export const SABOTAGE_CARDS = [
   },
   {
     id: 'RELATIONAL_OVERLOAD',
-    name: 'Sobrecarga Relacional',
-    subtitle: 'OVERLOAD',
+    name: 'Depuração Relacional',
+    subtitle: 'AJUDA 50/50',
     cost: 800,
-    desc: 'Drena 15s instantaneamente do cronômetro da equipe rival.',
-    icon: 'Cpu',
-    color: 'pink'
+    desc: 'Elimina 1 alternativa incorreta da pergunta atual para a sua equipe.',
+    icon: 'Sparkles',
+    color: 'pink',
+    isHelp: true
   },
   {
     id: 'PARALLEL_LOCK',

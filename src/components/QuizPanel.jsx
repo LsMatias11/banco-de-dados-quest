@@ -7,6 +7,7 @@ export default function QuizPanel({
   selectedOption,
   isAnswered,
   answerResult,
+  eliminatedOptions = [],
   currentPlayer,
   activeTeam,
   studentName,
@@ -259,12 +260,16 @@ export default function QuizPanel({
             {currentQuestion.options.map((optionText, idx) => {
               const isSelected = selectedOption === idx;
               const isCorrectAnswer = idx === currentQuestion.correctIndex;
-              const canInteract = isGameStarted && !isGamePaused && !isAnswered && canTeamAnswer && timer > 0;
+              const isEliminated = Array.isArray(eliminatedOptions) && eliminatedOptions.includes(idx);
+              const canInteract = isGameStarted && !isGamePaused && !isAnswered && canTeamAnswer && timer > 0 && !isEliminated;
 
               let cardStyle = "border-slate-700 bg-slate-900/90 hover:border-cyan-400 hover:bg-arcade-surface/60 text-slate-200";
               let btnLetterStyle = "bg-arcade-card border-cyan-400/40 text-cyan-300 group-hover:text-white group-hover:border-cyan-300";
 
-              if (!isGameStarted || isGamePaused) {
+              if (isEliminated) {
+                cardStyle = "border-dashed border-red-500/40 bg-slate-950/75 text-slate-500 opacity-40 line-through cursor-not-allowed pointer-events-none";
+                btnLetterStyle = "bg-red-950/80 border-red-500/40 text-red-400 line-through";
+              } else if (!isGameStarted || isGamePaused) {
                 cardStyle = "border-slate-800 bg-slate-950/60 text-slate-400 opacity-75 cursor-not-allowed";
               } else if (timer <= 0 && !isAnswered) {
                 cardStyle = "border-red-900/60 bg-red-950/30 text-red-400/80 opacity-60 cursor-not-allowed";
@@ -301,6 +306,11 @@ export default function QuizPanel({
                     </span>
                   </div>
 
+                  {isEliminated && (
+                    <span className="text-[10px] font-mono font-bold text-red-400 bg-red-950/90 border border-red-500/40 px-2 py-0.5 rounded shrink-0 self-center not-italic tracking-wider">
+                      ❌ ELIMINADA
+                    </span>
+                  )}
                   {isAnswered && isCorrectAnswer && (
                     <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 self-center" />
                   )}
